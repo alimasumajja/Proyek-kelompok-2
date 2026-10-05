@@ -20,9 +20,12 @@ npx create-expo-app@latest
 Tugas Member:
 1. accept invite
 2. Bukti konfirmasi
-
+Noval
+![alt text](image-1.png)
 3. clone Proyek
 4. Bukti konfirmasi
+Noval
+![alt text](image-2.png)
 
 Tugas Bersama:
 1. Diskusi Penentuan Tema(notulen diskusi)
