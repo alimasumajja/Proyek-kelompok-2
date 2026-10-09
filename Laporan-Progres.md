@@ -37,5 +37,15 @@ Avis
 Avis
 ![alt text](image-3.png)
 
+
+1. accept invite
+2. Bukti konfirmasi
+aji
+![alt text](<Screenshot 2026-10-06 231427.png>)
+3. clone proyek
+4. Bukti konfirmasi
+aji
+![alt text](image-4.png)
+
 Tugas Bersama:
 1. Diskusi Penentuan Tema(notulen diskusi)
