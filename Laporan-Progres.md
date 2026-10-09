@@ -27,5 +27,15 @@ Noval
 Noval
 ![alt text](image-2.png)
 
+
+1. accept invite
+2. Bukti konfirmasi
+Avis
+![alt text](<Cuplikan layar 2026-10-06 190711.png>)
+3. clone Proyek
+4. Bukti konfirmasi
+Avis
+![alt text](image-3.png)
+
 Tugas Bersama:
 1. Diskusi Penentuan Tema(notulen diskusi)
