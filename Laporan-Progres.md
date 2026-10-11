@@ -27,7 +27,7 @@ Noval
 Noval
 ![alt text](image-2.png)
 
-
+Avis
 1. accept invite
 2. Bukti konfirmasi
 Avis
@@ -37,7 +37,16 @@ Avis
 Avis
 ![alt text](image-3.png)
 
+Tamam
+1. accept invite
+2. Bukti konfirmasi
+Tamam
+![alt text](image-4.png)
+3. clone Proyek
+4. Bukti konfirmasi
+![alt text](image-5.png)
 
+aji
 1. accept invite
 2. Bukti konfirmasi
 aji
