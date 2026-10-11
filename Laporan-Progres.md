@@ -46,5 +46,18 @@ Tamam
 4. Bukti konfirmasi
 ![alt text](image-5.png)
 
+<<<<<<< HEAD
+aji
+1. accept invite
+2. Bukti konfirmasi
+aji
+![alt text](<Screenshot 2026-10-06 231427.png>)
+3. clone proyek
+4. Bukti konfirmasi
+aji
+![alt text](image-4.png)
+
+=======
+>>>>>>> origin/main
 Tugas Bersama:
 1. Diskusi Penentuan Tema(notulen diskusi)
