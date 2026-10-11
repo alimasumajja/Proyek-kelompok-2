@@ -46,6 +46,7 @@ Tamam
 4. Bukti konfirmasi
 ![alt text](image-5.png)
 
+<<<<<<< HEAD
 aji
 1. accept invite
 2. Bukti konfirmasi
@@ -56,5 +57,7 @@ aji
 aji
 ![alt text](image-4.png)
 
+=======
+>>>>>>> origin/main
 Tugas Bersama:
 1. Diskusi Penentuan Tema(notulen diskusi)
