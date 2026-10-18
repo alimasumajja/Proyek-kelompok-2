@@ -116,10 +116,69 @@ Mengajukan:
 
     Target Pengguna: Pemilik usaha
 
-## Hasil dan Keputusan ##
-Tema yang diusulkan: Inventaris UMKM
-Alasan pemilihan:
-1.	Melihat dari kapasitas tim
-2.	Membantu menyelesaikan permasalahan yang di alami oleh pemilik usaha yang menggunakan pencatatan secara manual mengenai stok, gaji karyawan, pendapatan, dan pengeluaran.
 
-Target pengguna: Pemilik usaha
+
+
+
+
+# PROGRES PENGEMBANGAN II #
+
+### Tema proyek ###
+Aplikasi Pengembangan notaris
+
+### Wawancara Kebutuhan Pengguna ###
+Aplikasi: NotarisAI
+Narasumber:
+Metode: Google Meet / online
+Tujuan: Mengidentifikasi kebutuhan Pengguna 
+Bukti:
+
+<img src= "image-6.png" width = "20%">
+<img src= "image-7.png" width = "15%">
+
+### Temuan ###
+Berdasarkan Hasil wawancara kami menemukan temuan:
+1. Progres pekerjaan dipantau melalui WhatsApp atau komunikasi langsung
+2. Notaris perlu berulang kali meminta status pekerjaan kepada staf
+3. Staf dan notaris sering lupa posisi terakhir suatu berkas
+4. Belum ada pencatatan durasi pada setiap tahap pekerjaan
+5. Berkas yang terlambat atau tidak diperbarui mudah terlewat
+6. Pencatatan akta dan penutupan buku bulanan masih manual
+7. Belum tersedia satu tempat untuk melihat pekerjaan aktif dan selesai
+
+## Dari temuan tersebut mendapatkan Requirement Sistem: ##
+1. FR-01 : Sistem menyediakan fitur pembaruan dan pemantauan progres pekerjaan secara terpusat
+2. FR-02 : Sistem menampilkan status terbaru setiap pekerjaan yang dapat diakses oleh pengguna sesuai hak aksesnya
+3. FR-03 : Sistem menyimpan status terakhir dan riwayat perubahan setiap berkas
+4. FR-04 : Sistem mencatat waktu mulai, waktu selesai, dan durasi setiap tahap pekerjaan
+5. FR-05 : Sistem menampilkan indikator keterlambatan dan pekerjaan yang belum diperbarui
+6. FR-06 : Sistem menyediakan fitur pencatatan data akta dan penyusunan rekapitulasi untuk penutupan buku bulanan
+7. FR-07 : Sistem menyediakan dashboard yang menampilkan daftar pekerjaan aktif dan selesai beserta statusnya
+
+### Pembagian Tugas ###
+Pembagian tugas pengerjaan diakukan secara diskusi bersama 
+
+## Progres Layar Halaman ##
+1. Halaman Login
+
+<img src = "login.gif" width = "25%">
+
+2. Halaman Home/Dashboard
+
+(image disini)
+
+3. Halaman Layanan
+
+(image disini)
+
+4. Halaman Tambah layanan
+
+(image disini)
+
+5. Halaman Laporan
+
+(image disini)
+
+6. Halaman Profile
+
+(image disini)
