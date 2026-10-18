@@ -20,7 +20,7 @@ export function BottomTabBar() {
     <View style={styles.tabContainer}>
       {/* 1. Beranda */}
       <Pressable
-        onPress={() => router.push('/')}
+        onPress={() => router.navigate('/')}
         style={styles.tabItem}>
         <IconHome size={22} color="#9CA3AF" />
         <Text style={styles.tabLabelInactive}>Beranda</Text>
@@ -52,7 +52,7 @@ export function BottomTabBar() {
 
       {/* 5. Profil */}
       <Pressable
-        onPress={() => router.push('/profil')}
+        onPress={() => router.navigate('/profil')}
         style={styles.tabItem}>
         <IconUser
           size={22}
