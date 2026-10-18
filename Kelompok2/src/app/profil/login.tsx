@@ -18,7 +18,11 @@ import {
 } from '@/components/profil/icons';
 import { NotarisColors } from '@/components/profil/theme';
 
-export default function LoginScreen() {
+interface LoginScreenProps {
+  onLoginSuccess?: () => void;
+}
+
+export default function LoginScreen({ onLoginSuccess }: LoginScreenProps = {}) {
   const router = useRouter();
 
   const [email, setEmail] = useState('notaris@kantor.id');
@@ -26,8 +30,11 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = () => {
-    // Navigate to profile
-    router.replace('/profil');
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    } else {
+      router.replace('/profil');
+    }
   };
 
   return (
@@ -239,3 +246,4 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 });
+

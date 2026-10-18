@@ -24,9 +24,14 @@ import {
   IconLogout,
 } from '@/components/profil/icons';
 import { NotarisColors } from '@/components/profil/theme';
+import ManajemenStafScreen from './manajemen-staf';
+import LoginScreen from './login';
 
 export default function ProfilScreen() {
   const router = useRouter();
+
+  // Active view: 'profil' | 'manajemen-staf' | 'login'
+  const [currentView, setCurrentView] = useState<'profil' | 'manajemen-staf' | 'login'>('profil');
 
   // Role state: 'notaris' | 'staf'
   const [role, setRole] = useState<UserRole>('notaris');
@@ -92,10 +97,18 @@ export default function ProfilScreen() {
 
   const handleConfirmLogout = () => {
     setShowLogoutModal(false);
-    router.push('/profil/login');
+    setCurrentView('login');
   };
 
   const currentUser = role === 'notaris' ? notarisData : stafData;
+
+  if (currentView === 'manajemen-staf') {
+    return <ManajemenStafScreen onBack={() => setCurrentView('profil')} />;
+  }
+
+  if (currentView === 'login') {
+    return <LoginScreen onLoginSuccess={() => setCurrentView('profil')} />;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -143,7 +156,7 @@ export default function ProfilScreen() {
                 icon={<IconUsers size={19} color="#374151" />}
                 title="Manajemen Staf"
                 subtitle="3 akun aktif"
-                onPress={() => router.push('/profil/manajemen-staf')}
+                onPress={() => setCurrentView('manajemen-staf')}
                 showDivider={true}
               />
             )}
@@ -311,3 +324,4 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 });
+

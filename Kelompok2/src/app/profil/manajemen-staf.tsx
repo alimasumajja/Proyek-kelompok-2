@@ -20,7 +20,11 @@ import { EditStafSheet, StaffData } from '@/components/profil/EditStafSheet';
 import { ToastNotification } from '@/components/profil/ToastNotification';
 import { NotarisColors } from '@/components/profil/theme';
 
-export default function ManajemenStafScreen() {
+interface ManajemenStafScreenProps {
+  onBack?: () => void;
+}
+
+export default function ManajemenStafScreen({ onBack }: ManajemenStafScreenProps = {}) {
   const router = useRouter();
 
   // Initial staff list matching Figma frames
@@ -124,7 +128,7 @@ export default function ManajemenStafScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => (onBack ? onBack() : router.back())}
           hitSlop={12}
           style={styles.backButton}>
           <IconBack size={20} color="#111827" />
@@ -345,3 +349,4 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 });
+
