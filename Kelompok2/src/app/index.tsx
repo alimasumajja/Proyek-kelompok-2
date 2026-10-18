@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link } from 'expo-router';
 
 import { AnimatedIcon } from '@/components/animated-icon';
 import { HintRow } from '@/components/hint-row';
@@ -54,6 +55,25 @@ export default function HomeScreen() {
             hint={<ThemedText type="code">npm run reset-project</ThemedText>}
           />
         </ThemedView>
+
+        <Link href="/profil" asChild>
+          <Pressable
+            style={({ pressed }) => [
+              {
+                backgroundColor: '#173F35',
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 12,
+                marginTop: 6,
+                alignItems: 'center',
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}>
+            <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13.5 }}>
+              Buka Halaman Profil (NotarisAI) &rarr;
+            </ThemedText>
+          </Pressable>
+        </Link>
 
         {Platform.OS === 'web' && <WebBadge />}
       </SafeAreaView>
