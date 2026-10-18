@@ -417,3 +417,4 @@ export function IconChart({ size = 20, color = '#9CA3AF' }: IconProps) {
     </View>
   );
 }
+

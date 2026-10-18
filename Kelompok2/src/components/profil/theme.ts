@@ -34,3 +34,4 @@ export const NotarisColors = {
   toastBg: '#1C312B',
   toastText: '#FFFFFF',
 } as const;
+
