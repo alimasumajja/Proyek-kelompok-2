@@ -156,29 +156,30 @@ Berdasarkan Hasil wawancara kami menemukan temuan:
 7. FR-07 : Sistem menyediakan dashboard yang menampilkan daftar pekerjaan aktif dan selesai beserta statusnya
 
 ### Pembagian Tugas ###
-Pembagian tugas pengerjaan diakukan secara diskusi bersama 
+Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
+
 
 ## Progres Layar Halaman ##
-1. Halaman Login
+1. Halaman Login (Ali)
 
 <img src = "login.gif" width = "25%">
 
-2. Halaman Home/Dashboard
+2. Halaman Home/Dashboard (Noval)
 
 (image disini)
 
-3. Halaman Layanan
+3. Halaman Layanan (Noval)
 
 (image disini)
 
-4. Halaman Tambah layanan
+4. Halaman Tambah layanan (Aji)
 
 (image disini)
 
-5. Halaman Laporan
+5. Halaman Laporan (Tamam)
 
 (image disini)
 
-6. Halaman Profile
+6. Halaman Profile (Avis)
 
 (image disini)
