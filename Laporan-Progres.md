@@ -180,7 +180,7 @@ Aplikasi Pengembangan notaris
 
 ### Wawancara Kebutuhan Pengguna ###
 Aplikasi: NotarisAI
-Narasumber:
+Narasumber: Fx Danu Getar Pranaya
 Metode: Google Meet / online
 Tujuan: Mengidentifikasi kebutuhan Pengguna 
 Bukti:
@@ -198,7 +198,7 @@ Berdasarkan Hasil wawancara kami menemukan temuan:
 6. Pencatatan akta dan penutupan buku bulanan masih manual
 7. Belum tersedia satu tempat untuk melihat pekerjaan aktif dan selesai
 
-# Dari temuan tersebut mendapatkan Requirement Sistem: #
+
 ## Dari temuan tersebut mendapatkan Requirement Sistem: ##
 1. FR-01 : Sistem menyediakan fitur pembaruan dan pemantauan progres pekerjaan secara terpusat
 2. FR-02 : Sistem menampilkan status terbaru setiap pekerjaan yang dapat diakses oleh pengguna sesuai hak aksesnya
@@ -212,49 +212,23 @@ Berdasarkan Hasil wawancara kami menemukan temuan:
 
 Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
 
-# Progres Layar Halaman #
-### Pembagian Tugas ###
-Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
-
 
 ## Progres Layar Halaman ##
 1. Halaman Login (Ali)
 
 <img src = "login.gif" width = "25%">
 
-1. Halaman Home/Dashboard (Noval)
-
-<img src = "Dashboard-Home.gif" width = "25%">
-
-2. Halaman Layanan (Noval)
-
-<img src = "layanan.gif" width = "25%">
-
-3. Halaman Tambah layanan (Aji)
-
-<img src = "Tambah layanan.gif" width = "25%">
-
-4. Halaman Laporan (Tamam)
-(image disini)
-
-5. Halaman Profile (Avis)
-(image disini)
 2. Halaman Home/Dashboard (Noval)
 
 <img src = "Dashboard-Home.gif" width = "25%">
 
 3. Halaman Layanan (Noval)
 
-<img src = "Layanan.gif" width = "25%">
-(image disini)
-
-3. Halaman Layanan (Noval)
-
-(image disini)
+<img src = "layanan.gif" width = "25%">
 
 4. Halaman Tambah layanan (Aji)
 
-(image disini)
+<img src = "Tambah layanan.gif" width = "25%">
 
 5. Halaman Laporan (Tamam)
 
