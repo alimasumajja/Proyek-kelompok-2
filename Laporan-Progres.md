@@ -46,7 +46,7 @@ Tamam
 4. Bukti konfirmasi
 ![alt text](image-5.png)
 
-<<<<<<< HEAD
+
 aji
 1. accept invite
 2. Bukti konfirmasi
@@ -57,7 +57,97 @@ aji
 aji
 ![alt text](image-4.png)
 
-=======
->>>>>>> origin/main
+
 Tugas Bersama:
 1. Diskusi Penentuan Tema(notulen diskusi)
+
+### NOTULENSI DISKUSI PROYEK KELOMPOK 2 ###
+Nama Kelompok : Kelompok 2 Hari/Tanggal : Sabtu, 10 Oktober 2026 Waktu : 20.00 – 21.00 WIB Tempat/Media : Google Meet
+
+## Agenda Diskusi ##
+1. Mengusulkan ide tema aplikasi mobile
+2. Menentukan target pengguna aplikasi
+
+## Daftar Ide Tema ##
+
+# Noval #
+Mengajukan :
+
+1. Aplikasi Manajemen Pondok pesantren
+Target Pengguna: Santri
+
+2. Aplikasi Penyewaan Sepeda
+Target pengguna: Pemilik Penyewaan
+
+# Tamam #
+Mengajukan:
+
+1. Pencatatan Data Notaris
+Target pengguna: Notaris
+
+# Ali #
+Mengajukan:
+
+1. Aplikasi Manajemen Tugas
+Target Pengguna: Mahasiswa
+
+# Avis #
+Mengajukan:
+
+1. Inventaris UMKM
+Target Pengguna: Pemilik usaha
+
+### PROGRES PENGEMBANGAN II ###
+
+# Tema proyek #
+Aplikasi Pengembangan notaris
+
+# Wawancara Kebutuhan Pengguna #
+Aplikasi: NotarisAI Narasumber: Metode: Google Meet / online Tujuan: Mengidentifikasi kebutuhan Pengguna Bukti:
+
+
+
+
+
+# Temuan #
+Berdasarkan Hasil wawancara kami menemukan temuan:
+
+1. Progres pekerjaan dipantau melalui WhatsApp atau 2. 2.komunikasi langsung
+2. Notaris perlu berulang kali meminta status pekerjaan kepada staf
+3. Staf dan notaris sering lupa posisi terakhir suatu berkas
+4. Belum ada pencatatan durasi pada setiap tahap pekerjaan
+5. Berkas yang terlambat atau tidak diperbarui mudah terlewat
+6. Pencatatan akta dan penutupan buku bulanan masih manual
+7. Belum tersedia satu tempat untuk melihat pekerjaan aktif dan selesai
+
+# Dari temuan tersebut mendapatkan Requirement Sistem: #
+1. FR-01 : Sistem menyediakan fitur pembaruan dan pemantauan progres pekerjaan secara terpusat
+2. FR-02 : Sistem menampilkan status terbaru setiap pekerjaan yang dapat diakses oleh pengguna sesuai hak aksesnya
+3. FR-03 : Sistem menyimpan status terakhir dan riwayat perubahan setiap berkas
+4. FR-04 : Sistem mencatat waktu mulai, waktu selesai, dan durasi setiap tahap pekerjaan
+5. FR-05 : Sistem menampilkan indikator keterlambatan dan pekerjaan yang belum diperbarui
+6. FR-06 : Sistem menyediakan fitur pencatatan data akta dan penyusunan rekapitulasi untuk penutupan buku bulanan
+7. FR-07 : Sistem menyediakan dashboard yang menampilkan daftar pekerjaan aktif dan selesai beserta statusnya
+
+# Pembagian Tugas #
+
+Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
+
+# Progres Layar Halaman #
+Halaman Login (Ali)
+
+
+1. Halaman Home/Dashboard (Noval)
+(image disini)
+
+2. Halaman Layanan (Noval)
+(image disini)
+
+3. Halaman Tambah layanan (Aji)
+(image disini)
+
+4. Halaman Laporan (Tamam)
+(image disini)
+
+5. Halaman Profile (Avis)
+(image disini)
