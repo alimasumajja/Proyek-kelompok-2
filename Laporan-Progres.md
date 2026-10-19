@@ -166,6 +166,11 @@ Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar melip
 
 2. Halaman Home/Dashboard (Noval)
 
+<img src = "Dashboard-Home.gif" width = "25%">
+
+3. Halaman Layanan (Noval)
+
+<img src = "Layanan.gif" width = "25%">
 (image disini)
 
 3. Halaman Layanan (Noval)
