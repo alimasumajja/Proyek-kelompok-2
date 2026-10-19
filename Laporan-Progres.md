@@ -134,17 +134,21 @@ Berdasarkan Hasil wawancara kami menemukan temuan:
 Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
 
 # Progres Layar Halaman #
-Halaman Login (Ali)
+1. Halaman Login (Ali)
 
+<img src = "login.gif" width = "25%">
 
 1. Halaman Home/Dashboard (Noval)
-(image disini)
+
+<img src = "Dashboard-Home.gif" width = "25%">
 
 2. Halaman Layanan (Noval)
-(image disini)
+
+<img src = "layanan.gif" width = "25%">
 
 3. Halaman Tambah layanan (Aji)
-(image disini)
+
+<img src = "Tambah layanan.gif" width = "25%">
 
 4. Halaman Laporan (Tamam)
 (image disini)
