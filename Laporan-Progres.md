@@ -171,6 +171,11 @@ Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar melip
 3. Halaman Layanan (Noval)
 
 <img src = "Layanan.gif" width = "25%">
+(image disini)
+
+3. Halaman Layanan (Noval)
+
+(image disini)
 
 4. Halaman Tambah layanan (Aji)
 
