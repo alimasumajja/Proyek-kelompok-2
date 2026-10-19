@@ -178,7 +178,7 @@ Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar melip
 
 5. Halaman Laporan (Tamam)
 
-(image disini)
+![alt text](20261019-0239-36.0167463.gif)
 
 6. Halaman Profile (Avis)
 
