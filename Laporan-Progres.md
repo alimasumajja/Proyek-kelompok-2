@@ -13,47 +13,64 @@
 ![alt text](image.png)
 3. PM membuat inisiasi Proyek
 4. Konfirmasi Bukti
-<video width = "25%" controls src="Recording-2026-10-05-120706.mp4" title="Title"></video>
+
+
+<img src = "Recording.gif" width = "25%">
+
 
 npx create-expo-app@latest
 
 Tugas Member:
 1. accept invite
 2. Bukti konfirmasi
+
 Noval
 ![alt text](image-1.png)
+
 3. clone Proyek
 4. Bukti konfirmasi
+
 Noval
 ![alt text](image-2.png)
 
 Avis
 1. accept invite
 2. Bukti konfirmasi
+
 Avis
 ![alt text](<Cuplikan layar 2026-10-06 190711.png>)
+
 3. clone Proyek
 4. Bukti konfirmasi
+
 Avis
 ![alt text](image-3.png)
+
 
 Tamam
 1. accept invite
 2. Bukti konfirmasi
+
 Tamam
-![alt text](image-4.png)
+![alt text](accept_amam.png)
+
 3. clone Proyek
 4. Bukti konfirmasi
+
+Tamam
 ![alt text](image-5.png)
 
 
 aji
 1. accept invite
 2. Bukti konfirmasi
+
 aji
 ![alt text](<Screenshot 2026-10-06 231427.png>)
+
 3. clone proyek
 4. Bukti konfirmasi
+
 aji
 ![alt text](image-4.png)
 
@@ -113,6 +130,67 @@ Aplikasi: NotarisAI Narasumber: Metode: Google Meet / online Tujuan: Mengidentif
 Berdasarkan Hasil wawancara kami menemukan temuan:
 
 1. Progres pekerjaan dipantau melalui WhatsApp atau 2. 2.komunikasi langsung
+# NOTULENSI DISKUSI PROYEK KELOMPOK 2 #
+Nama Kelompok	: Kelompok 2
+Hari/Tanggal	: Sabtu, 10 Oktober 2026
+Waktu           : 20.00 – 21.00 WIB
+Tempat/Media	: Google Meet
+
+## Agenda Diskusi ##
+1.	Mengusulkan ide tema aplikasi mobile
+2.	Menentukan target pengguna aplikasi
+
+## Daftar Ide Tema ##
+
+### Noval ###
+Mengajukan :
+1)	Aplikasi Manajemen Pondok pesantren
+
+    Target Pengguna: Santri
+
+2)	Aplikasi Penyewaan Sepeda
+
+    Target pengguna: Pemilik Penyewaan
+
+### Tamam ###
+Mengajukan:
+1)	Pencatatan Data Notaris
+
+    Target pengguna: Notaris
+### Ali ###
+Mengajukan:
+1)	Aplikasi Manajemen Tugas
+
+    Target Pengguna: Mahasiswa
+### Avis ###
+Mengajukan:
+1)	Inventaris UMKM
+
+    Target Pengguna: Pemilik usaha
+
+
+
+
+
+
+# PROGRES PENGEMBANGAN II #
+
+### Tema proyek ###
+Aplikasi Pengembangan notaris
+
+### Wawancara Kebutuhan Pengguna ###
+Aplikasi: NotarisAI
+Narasumber:
+Metode: Google Meet / online
+Tujuan: Mengidentifikasi kebutuhan Pengguna 
+Bukti:
+
+<img src= "image-6.png" width = "20%">
+<img src= "image-7.png" width = "15%">
+
+### Temuan ###
+Berdasarkan Hasil wawancara kami menemukan temuan:
+1. Progres pekerjaan dipantau melalui WhatsApp atau komunikasi langsung
 2. Notaris perlu berulang kali meminta status pekerjaan kepada staf
 3. Staf dan notaris sering lupa posisi terakhir suatu berkas
 4. Belum ada pencatatan durasi pada setiap tahap pekerjaan
@@ -121,6 +199,7 @@ Berdasarkan Hasil wawancara kami menemukan temuan:
 7. Belum tersedia satu tempat untuk melihat pekerjaan aktif dan selesai
 
 # Dari temuan tersebut mendapatkan Requirement Sistem: #
+## Dari temuan tersebut mendapatkan Requirement Sistem: ##
 1. FR-01 : Sistem menyediakan fitur pembaruan dan pemantauan progres pekerjaan secara terpusat
 2. FR-02 : Sistem menampilkan status terbaru setiap pekerjaan yang dapat diakses oleh pengguna sesuai hak aksesnya
 3. FR-03 : Sistem menyimpan status terakhir dan riwayat perubahan setiap berkas
@@ -134,6 +213,11 @@ Berdasarkan Hasil wawancara kami menemukan temuan:
 Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
 
 # Progres Layar Halaman #
+### Pembagian Tugas ###
+Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar meliputi: halaman login, dashboard, layanan, tambah layanan, laporan, dan profile.
+
+
+## Progres Layar Halaman ##
 1. Halaman Login (Ali)
 
 <img src = "login.gif" width = "25%">
@@ -154,4 +238,28 @@ Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar melip
 (image disini)
 
 5. Halaman Profile (Avis)
+(image disini)
+2. Halaman Home/Dashboard (Noval)
+
+<img src = "Dashboard-Home.gif" width = "25%">
+
+3. Halaman Layanan (Noval)
+
+<img src = "Layanan.gif" width = "25%">
+(image disini)
+
+3. Halaman Layanan (Noval)
+
+(image disini)
+
+4. Halaman Tambah layanan (Aji)
+
+(image disini)
+
+5. Halaman Laporan (Tamam)
+
+(image disini)
+
+6. Halaman Profile (Avis)
+
 (image disini)
