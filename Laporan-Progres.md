@@ -232,8 +232,8 @@ Pembagian tugas pengerjaan dilakukan secara diskusi bersama, halaman layar melip
 
 5. Halaman Laporan (Tamam)
 
-(image disini)
+<img src = "laporan.gif" width = "25%">
 
 6. Halaman Profile (Avis)
 
-(image disini)
+<img src = "profile.gif" width = "80%">
