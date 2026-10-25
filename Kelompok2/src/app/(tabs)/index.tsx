@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { HomeScreen } from '@/screens/HomeScreen';
+import { HomeScreen } from '@/screens/home/HomeScreen';
 import type { ServiceTab } from '@/types/service';
 
 /** Route Beranda — tab 1. Menghubungkan HomeScreen dengan navigasi (tab & halaman turunan). */

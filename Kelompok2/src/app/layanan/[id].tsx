@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ServiceDetailScreen } from '@/screens/ServiceDetailScreen';
+import { ServiceDetailScreen } from '@/screens/services/ServiceDetailScreen';
 
 /**
  * Route Detail Layanan: /layanan/[id].

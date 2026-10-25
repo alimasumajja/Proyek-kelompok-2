@@ -1,4 +1,4 @@
-import SplashScreen from '../screens/screenawal'; // Sesuaikan dengan nama fail Anda
+import SplashScreen from '../screens/auth/screenawal';
 
 export default function ScreenAwalRoute() {
   return <SplashScreen />;
