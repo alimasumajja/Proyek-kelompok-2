@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { NotificationsScreen } from '@/screens/NotificationsScreen';
+import { NotificationsScreen } from '@/screens/notifications/NotificationsScreen';
 
 /** Route Notifikasi: /notifikasi (di luar tab, bottom nav tersembunyi seperti di Figma). */
 export default function NotificationsRoute() {

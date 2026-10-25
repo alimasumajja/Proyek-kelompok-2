@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { LayananScreen } from '@/screens/LayananScreen';
+import { LayananScreen } from '@/screens/services/LayananScreen';
 import { parseServiceTab } from '@/utils/service';
 
 /** Route Layanan — tab 2. Membaca parameter `filter` dari Beranda. */
