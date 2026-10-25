@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "app-layanan",
+    "slug": "app-layanan",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "layanan",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"]
+  }
+}
