@@ -1,8 +1,17 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, StatusBar, ActivityIndicator, Platform } from 'react-native';
 import { router } from 'expo-router';
-
+import { NotaryColors } from '@/constants/notary-theme';
 export default function SplashScreen() {
+  // Logika untuk berpindah halaman secara otomatis
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      router.replace('/login'); 
+    }, 2500); // 2500 milidetik = 2.5 detik durasi loading
+
+    return () => clearTimeout(timer); // Membersihkan memori timer
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content"/>
@@ -20,13 +29,10 @@ export default function SplashScreen() {
         <Text style={styles.subtitle}>Manajemen Operasional Kantor Notaris</Text>
       </View>
 
-      {/* Tombol Aksi Bawah */}
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={() => router.push('/login')}
-      >
-        <Text style={styles.buttonText}>Masuk</Text>
-      </TouchableOpacity>
+      {/* Indikator Loading Bawah */}
+      <View style={styles.bottomContainer}>
+        <ActivityIndicator size="large" color="#D4AF37" />
+      </View>
     </View>
   );
 }
@@ -34,7 +40,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#17352D', // Hijau gelap sesuai desain
+    backgroundColor: '#17352D', 
     justifyContent: 'space-between',
     paddingVertical: 48,
     paddingHorizontal: 24,
@@ -46,7 +52,7 @@ const styles = StyleSheet.create({
   },
   logoBox: {
     borderWidth: 1,
-    borderColor: '#D4AF37', // Garis tepi emas
+    borderColor: '#D4AF37', 
     borderRadius: 16,
     width: 64,
     height: 64,
@@ -54,11 +60,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  logoLetter: {
-    color: '#D4AF37',
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
+logoLetter: { color: NotaryColors.gold, fontSize: 28 ,fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }) },
   logoText: {
     color: '#ffffff',
     fontSize: 28,
@@ -72,18 +74,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
   },
-  button: {
-    backgroundColor: '#00875A', // Warna hijau tombol yang lebih terang
-    borderRadius: 9999, // Kapsul penuh mengikuti desain Apple
+  bottomContainer: {
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
     marginBottom: 24,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
+    width: '100%',
+  }
 });
