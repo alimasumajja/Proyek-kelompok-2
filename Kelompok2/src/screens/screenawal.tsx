@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 export default function SplashScreen() {
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#17352D" />
+      <StatusBar barStyle="light-content"/>
       
       {/* Konten Tengah (Logo dan Teks) */}
       <View style={styles.content}>

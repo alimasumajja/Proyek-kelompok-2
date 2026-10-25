@@ -25,7 +25,7 @@ export default function LoginScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#17352D" />
+      <StatusBar barStyle="light-content" />
       
       {/* --- Bagian Header Hijau --- */}
       <View style={styles.header}>
