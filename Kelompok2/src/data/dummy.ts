@@ -1,10 +1,19 @@
-import { ActivityItem, NearestDeadline, OperationalSummary, ServiceItem } from '@/types/service';
+import type {
+  ActivityItem,
+  ServiceActivity,
+  ServiceNote,
+  NearestDeadline,
+  NotificationItem,
+  OperationalSummary,
+  ServiceItem,
+} from '@/types/service';
 
 export const operationalSummaryData: OperationalSummary = {
   activeCount: 24,
   completedCount: 12,
   lateCount: 3,
   attentionCount: 5,
+  newIssueCount: 2,
 };
 
 export const servicesData: ServiceItem[] = [
@@ -71,6 +80,7 @@ export const servicesData: ServiceItem[] = [
 ];
 
 export const nearestDeadlineData: NearestDeadline = {
+  serviceId: '2',
   day: '14',
   month: 'MAR',
   serviceType: 'Akta Jual Beli',
@@ -107,3 +117,111 @@ export const recentActivitiesData: ActivityItem[] = [
     type: 'completed',
   },
 ];
+
+/** Pengguna aktif (data statis MVP; nanti dari sesi Supabase). */
+export const currentUserData = {
+  name: 'Nadia Larasati',
+  firstName: 'Nadia',
+  initials: 'NL',
+  role: 'Notaris' as const,
+};
+
+/** Tanggal "hari ini" statis agar selaras dengan data dummy. */
+export const todayLabel = 'SELASA, 12 MARET 2026';
+
+export const notificationsData: NotificationItem[] = [
+  {
+    id: 'notif-1',
+    serviceId: '3',
+    title: 'Target penyelesaian terlewati',
+    text: 'LAY-2026-0023 melewati target pada 10 Maret 2026.',
+    time: '10 menit lalu',
+    tone: 'danger',
+    read: false,
+  },
+  {
+    id: 'notif-2',
+    serviceId: '2',
+    title: 'Kendala baru ditambahkan',
+    text: 'Rina menambahkan kendala pada LAY-2026-0022.',
+    time: '1 jam lalu',
+    tone: 'warning',
+    read: false,
+  },
+  {
+    id: 'notif-3',
+    serviceId: '1',
+    title: 'Layanan perlu pemeriksaan',
+    text: 'Draf LAY-2026-0021 siap diperiksa oleh Notaris.',
+    time: 'Kemarin, 16.40',
+    tone: 'info',
+    read: false,
+  },
+];
+
+/** Pengguna yang dapat ditugaskan sebagai penanggung jawab. */
+export const staffDirectory = ['Andi Pratama', 'Rina Amelia', 'Nadia Larasati'];
+
+/** Nama staf pendukung (statis pada MVP dummy). */
+export const supportStaffName = 'Rina Amelia';
+
+/**
+ * Waktu tahap (dummy statis, sama dengan referensi Figma).
+ * Pada backend nanti dihitung dari tabel service_stage_history (PRD §6.5).
+ */
+export const stageTimingData = {
+  currentStageStartedAt: '10 Mar 2026',
+  currentStageDuration: '2 hari',
+  totalDuration: '18 hari',
+  completedStageAt: '8 Mar 2026, 16.20',
+};
+
+/** Catatan awal per id layanan. */
+export const serviceNotesData: Record<string, ServiceNote[]> = {
+  '2': [
+    {
+      id: 'N-1',
+      category: 'Kendala',
+      text: 'Menunggu konfirmasi jadwal penandatanganan dari salah satu pihak.',
+      author: 'Rina Amelia',
+      time: '12 Mar 2026 · 09.16',
+    },
+  ],
+};
+
+/** Riwayat awal per id layanan (selaras referensi Figma). */
+export const serviceActivitiesData: Record<string, ServiceActivity[]> = Object.fromEntries(
+  servicesData.map((service) => [
+    service.id,
+    [
+      {
+        id: `${service.id}-1`,
+        title: 'Tahap diperbarui',
+        text: `${service.assignedStaff.name} memindahkan layanan ke ${service.currentStage}`,
+        time: '10 Mar',
+        tone: 'green',
+      },
+      {
+        id: `${service.id}-2`,
+        title: 'Target penyelesaian diubah',
+        text: `Nadia Larasati menetapkan target ${service.dueDate}`,
+        time: '8 Mar',
+        tone: 'blue',
+      },
+      {
+        id: `${service.id}-3`,
+        title: 'Penanggung jawab ditetapkan',
+        text: `Ditugaskan kepada ${service.assignedStaff.name}`,
+        time: '24 Feb',
+        tone: 'amber',
+      },
+      {
+        id: `${service.id}-4`,
+        title: 'Layanan dibuat',
+        text: 'Data layanan didaftarkan oleh Rina Amelia',
+        time: '23 Feb',
+        tone: 'green',
+      },
+    ] satisfies ServiceActivity[],
+  ])
+);

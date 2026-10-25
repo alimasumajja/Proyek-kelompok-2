@@ -110,3 +110,41 @@ export const NotaryColors = {
     attentionBg: FigmaTokens.colors.statWarningBg,
   },
 };
+
+/** Skala radius sudut — dipakai konsisten di seluruh komponen. */
+export const Radius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  sheet: 24,
+  pill: 999,
+} as const;
+
+/** Skala jarak (spacing) dasar. */
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+} as const;
+
+/** Bayangan kartu standar (iOS shadow + Android elevation). */
+export const Shadow = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  bar: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+} as const;
