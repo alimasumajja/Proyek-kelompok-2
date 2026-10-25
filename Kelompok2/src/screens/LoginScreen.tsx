@@ -16,7 +16,7 @@ export default function LoginScreen() {
   const handleLogin = () => {
     // Karena UTS hanya fokus UI, kita abaikan Supabase.
     // Langsung arahkan pengguna ke halaman Dashboard/Home.
-    router.replace('./HomeScreen');
+    router.replace('/(tabs)');
   };
 
   // 3. Kerangka Visual (JSX)
@@ -25,7 +25,7 @@ export default function LoginScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#17352D" />
+      <StatusBar barStyle="light-content" />
       
       {/* --- Bagian Header Hijau --- */}
       <View style={styles.header}>

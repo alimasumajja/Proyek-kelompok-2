@@ -1,19 +1,27 @@
-export type ServiceStatus = 'Semua' | 'Aktif' | 'Terlambat' | 'Selesai' | 'Perlu Perhatian';
+/** Status layanan. Label teks selalu ditampilkan, tidak hanya warna (PRD §13.3). */
+export type ServiceStatus = 'Aktif' | 'Terlambat' | 'Selesai' | 'Perlu Perhatian';
+
+/** Tab/filter pada daftar layanan. */
+export type ServiceTab = 'Semua' | ServiceStatus;
+
+export type ServicePriority = 'Tinggi' | 'Sedang' | 'Rendah';
+
+export interface StaffRef {
+  name: string;
+  initials: string;
+}
 
 export interface ServiceItem {
   id: string;
-  code: string; // e.g. "LAY-2026-0021"
-  clientName: string; // e.g. "Budi Santoso"
-  serviceType: string; // e.g. "Pendirian Perseroan Terbatas"
-  currentStage: string; // e.g. "Penyusunan Draf"
-  progressPercent: number; // e.g. 37.5
-  assignedStaff: {
-    name: string;
-    initials: string;
-  };
-  dueDate: string; // e.g. "18 Mar 2026"
-  status: 'Aktif' | 'Terlambat' | 'Selesai' | 'Perlu Perhatian';
-  priority?: 'Tinggi' | 'Sedang' | 'Rendah';
+  code: string; // mis. "LAY-2026-0021"
+  clientName: string;
+  serviceType: string;
+  currentStage: string;
+  progressPercent: number; // 0–100, dihitung dari tahap (PRD §6.5), bukan input manual
+  assignedStaff: StaffRef;
+  dueDate: string; // mis. "18 Mar 2026"
+  status: ServiceStatus;
+  priority?: ServicePriority;
 }
 
 export interface OperationalSummary {
@@ -21,6 +29,7 @@ export interface OperationalSummary {
   completedCount: number;
   lateCount: number;
   attentionCount: number;
+  newIssueCount: number;
 }
 
 export interface ActivityItem {
@@ -33,12 +42,67 @@ export interface ActivityItem {
 }
 
 export interface NearestDeadline {
+  /** Layanan yang dibuka saat kartu diketuk. */
+  serviceId: string;
   day: string;
   month: string;
   serviceType: string;
   clientAndStage: string;
-  staff: {
-    name: string;
-    initials: string;
-  };
+  staff: StaffRef;
 }
+
+export type NotificationTone = 'danger' | 'warning' | 'info';
+
+export interface NotificationItem {
+  id: string;
+  /** Layanan yang dibuka saat notifikasi diketuk. */
+  serviceId?: string;
+  title: string;
+  text: string;
+  time: string;
+  tone: NotificationTone;
+  read: boolean;
+}
+
+export interface FilterState {
+  tab: ServiceTab;
+  query: string;
+  stage: string | null;
+  staff: string | null;
+  priority: ServicePriority | null;
+  sortByPriority: boolean;
+}
+
+export type UserRole = 'Notaris' | 'Staf';
+
+/** Kategori catatan — PRD §6.6. */
+export type NoteCategory =
+  | 'Pembaruan Progres'
+  | 'Kendala'
+  | 'Instruksi'
+  | 'Catatan Klien'
+  | 'Catatan Internal';
+
+export interface ServiceNote {
+  id: string;
+  category: NoteCategory;
+  text: string;
+  author: string;
+  time: string;
+}
+
+export type ActivityTone = 'green' | 'blue' | 'amber';
+
+/** Riwayat aktivitas layanan (audit trail) — PRD §6.9. */
+export interface ServiceActivity {
+  id: string;
+  title: string;
+  text: string;
+  time: string;
+  tone: ActivityTone;
+}
+
+/** Jenis perubahan tahap — PRD §6.4 (revisi berulang & tahap yang dilewati tercatat). */
+export type StageChangeKind = 'advance' | 'repeat' | 'skip';
+
+export type WorkflowStepState = 'done' | 'current' | 'skipped' | 'pending';
