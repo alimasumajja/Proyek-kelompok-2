@@ -94,3 +94,8 @@ export function getInitials(name: string): string {
     .join('')
     .toUpperCase();
 }
+
+/** Validasi email sederhana untuk formulir Profil (cukup untuk MVP; backend memvalidasi ulang). */
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}

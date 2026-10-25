@@ -1,3 +1,4 @@
+import type { NotificationPrefs, UserAccount } from '@/types/profile';
 import type {
   ActivityItem,
   ServiceActivity,
@@ -158,6 +159,66 @@ export const notificationsData: NotificationItem[] = [
     read: false,
   },
 ];
+
+/**
+ * Akun dummy untuk simulasi login & profil per peran (sementara; nanti dari Supabase Auth).
+ *
+ *   Notaris : nadia / notaris123
+ *   Staf    : andi  / staf123   ·   rina / staf123
+ *   Nonaktif: dewi  / staf123   (ditolak saat masuk)
+ */
+export const userAccountsData: UserAccount[] = [
+  {
+    id: 'acc-notaris',
+    username: 'nadia',
+    password: 'notaris123',
+    name: 'Nadia Larasati',
+    email: 'nadia.larasati@kantor.id',
+    initials: 'NL',
+    role: 'Notaris',
+    status: 'Aktif',
+  },
+  {
+    id: 'acc-andi',
+    username: 'andi',
+    password: 'staf123',
+    name: 'Andi Pratama',
+    email: 'andi.pratama@kantor.id',
+    initials: 'AP',
+    role: 'Staf',
+    status: 'Aktif',
+  },
+  {
+    id: 'acc-rina',
+    username: 'rina',
+    password: 'staf123',
+    name: 'Rina Amelia',
+    email: 'rina.amelia@kantor.id',
+    initials: 'RA',
+    role: 'Staf',
+    status: 'Aktif',
+  },
+  {
+    id: 'acc-dewi',
+    username: 'dewi',
+    password: 'staf123',
+    name: 'Dewi Anjani',
+    email: 'dewi.anjani@kantor.id',
+    initials: 'DA',
+    role: 'Staf',
+    status: 'Nonaktif',
+  },
+];
+
+/** Akun yang aktif saat aplikasi dibuka (sebelum ada sesi login nyata). */
+export const defaultAccountId = 'acc-notaris';
+
+/** Preferensi notifikasi awal. */
+export const notificationPrefsData: NotificationPrefs = {
+  deadlineNear: true,
+  newIssue: true,
+  noUpdate: true,
+};
 
 /** Pengguna yang dapat ditugaskan sebagai penanggung jawab. */
 export const staffDirectory = ['Andi Pratama', 'Rina Amelia', 'Nadia Larasati'];
