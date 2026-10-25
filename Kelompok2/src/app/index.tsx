@@ -13,7 +13,7 @@ export default function IndexScreen() {
         router.replace('/screenawal'); 
       } else {
         // Jika sudah login, arahkan ke dasbor utama
-         router.replace('/layanan');
+         router.replace('/(tabs)');
       }
     };
 

@@ -16,7 +16,7 @@ export default function LoginScreen() {
   const handleLogin = () => {
     // Karena UTS hanya fokus UI, kita abaikan Supabase.
     // Langsung arahkan pengguna ke halaman Dashboard/Home.
-    router.replace('./HomeScreen');
+    router.replace('/(tabs)');
   };
 
   // 3. Kerangka Visual (JSX)
