@@ -22,6 +22,9 @@ export interface ServiceItem {
   dueDate: string; // mis. "18 Mar 2026"
   status: ServiceStatus;
   priority?: ServicePriority;
+  receivedDate: string; // mis. "18 Mar 2026"
+  clientContact?: string;
+  description?: string;
 }
 
 export interface OperationalSummary {

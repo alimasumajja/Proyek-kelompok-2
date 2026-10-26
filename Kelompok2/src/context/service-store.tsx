@@ -5,16 +5,32 @@ import {
   serviceNotesData,
   servicesData,
 } from '@/data/dummy';
+import { SERVICE_STAGES } from '@/constants/service';
 import type {
   NotificationItem,
   ServiceActivity,
   ServiceItem,
   ServiceNote,
+  ServicePriority,
+  StaffRef,
   UserRole,
 } from '@/types/service';
+import { formatDateId } from '@/utils/date';
 
 type NewNote = Pick<ServiceNote, 'category' | 'text'>;
 type NewActivity = Pick<ServiceActivity, 'title' | 'text' | 'tone'>;
+
+/** Data dari formulir Tambah Layanan. Nomor, tahap awal, progres, dan status ditetapkan otomatis. */
+export interface NewServiceInput {
+  clientName: string;
+  serviceType: string;
+  receivedDate: Date;
+  assignedStaff: StaffRef;
+  priority: ServicePriority;
+  dueDate?: Date;
+  clientContact?: string;
+  description?: string;
+}
 
 interface ServiceStoreValue {
   services: ServiceItem[];
@@ -27,6 +43,7 @@ interface ServiceStoreValue {
   actorName: string;
   setRole: (role: UserRole) => void;
   getService: (id: string) => ServiceItem | undefined;
+  addService: (input: NewServiceInput) => ServiceItem;
   updateService: (service: ServiceItem) => void;
   addNote: (serviceId: string, note: NewNote) => void;
   addActivity: (serviceId: string, activity: NewActivity) => void;
@@ -58,6 +75,67 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
   const getService = useCallback(
     (id: string) => services.find((s) => s.id === id),
     [services]
+  );
+
+  const addService = useCallback(
+    (input: NewServiceInput): ServiceItem => {
+      // Nomor layanan: LAY-<tahun>-<urutan>, melanjutkan nomor terbesar yang ada.
+      const lastNumber = services.reduce((max, s) => {
+        const n = Number(s.code.split('-').pop());
+        return Number.isFinite(n) ? Math.max(max, n) : max;
+      }, 0);
+      const code = `LAY-${input.receivedDate.getFullYear()}-${String(lastNumber + 1).padStart(4, '0')}`;
+      const actor = ACTOR_BY_ROLE[role];
+
+      const created: ServiceItem = {
+        id: nextId('S'),
+        code,
+        clientName: input.clientName,
+        serviceType: input.serviceType,
+        currentStage: SERVICE_STAGES[0], // tahap awal selalu "Penerimaan Berkas"
+        progressPercent: 0,
+        assignedStaff: input.assignedStaff,
+        dueDate: input.dueDate ? formatDateId(input.dueDate) : '-',
+        status: 'Aktif',
+        priority: input.priority,
+        receivedDate: formatDateId(input.receivedDate),
+        clientContact: input.clientContact,
+        description: input.description,
+      };
+
+      setServices((prev) => [created, ...prev]);
+      setActivities((prev) => ({
+        ...prev,
+        [created.id]: [
+          {
+            id: nextId('A'),
+            title: 'Penanggung jawab ditetapkan',
+            text: `Ditugaskan kepada ${input.assignedStaff.name}`,
+            time: 'Baru saja',
+            tone: 'amber',
+          },
+          {
+            id: nextId('A'),
+            title: 'Layanan dibuat',
+            text: `Data layanan didaftarkan oleh ${actor}`,
+            time: 'Baru saja',
+            tone: 'green',
+          },
+        ],
+      }));
+      if (input.description) {
+        const note: ServiceNote = {
+          id: nextId('N'),
+          category: 'Catatan Klien',
+          text: input.description,
+          author: actor,
+          time: 'Baru saja',
+        };
+        setNotes((prev) => ({ ...prev, [created.id]: [note] }));
+      }
+      return created;
+    },
+    [services, role]
   );
 
   const updateService = useCallback((service: ServiceItem) => {
@@ -100,6 +178,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       actorName: ACTOR_BY_ROLE[role],
       setRole,
       getService,
+      addService,
       updateService,
       addNote,
       addActivity,
@@ -113,6 +192,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       unreadCount,
       role,
       getService,
+      addService,
       updateService,
       addNote,
       addActivity,
