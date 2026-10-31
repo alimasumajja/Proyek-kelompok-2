@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NotaryColors, Radius, Shadow } from '@/constants/notary-theme';
 import type { ServiceItem } from '@/types/service';
+import { formatDueDate, hasDueDate } from '@/utils/service';
 import { AppText, Avatar, Badge } from '../atoms';
 
 interface AssignmentCardProps {
@@ -57,9 +58,13 @@ export function AssignmentCard({ service, supportName, canEdit, onEdit }: Assign
           <AppText variant="micro" color={NotaryColors.textSecondary}>
             Target penyelesaian
           </AppText>
-          <AppText variant="heading">{service.dueDate}</AppText>
+          <AppText variant="heading">{formatDueDate(service.dueDate)}</AppText>
         </View>
-        <Badge label={late ? 'Terlewati' : 'Sesuai target'} tone={late ? 'danger' : 'success'} />
+        {hasDueDate(service.dueDate) ? (
+          <Badge label={late ? 'Terlewati' : 'Sesuai target'} tone={late ? 'danger' : 'success'} />
+        ) : (
+          <Badge label="Belum diatur" tone="neutral" />
+        )}
       </View>
     </View>
   );

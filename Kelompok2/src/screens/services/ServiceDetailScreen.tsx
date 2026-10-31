@@ -5,9 +5,11 @@ import { NotaryColors } from '@/constants/notary-theme';
 import { stageTimingData, supportStaffName } from '@/data/dummy';
 import { useServiceStore } from '@/context/service-store';
 import { useToast } from '@/context/toast';
+import { useSession } from '@/hooks/use-session';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import { formatDateId } from '@/utils/date';
 import { getInitials } from '@/utils/service';
+import { canAssignService, canViewService, isNotaris } from '@/utils/permissions';
 import { buildStageActivity, computeStageChange } from '@/utils/service-workflow';
 import { Button } from '@/components/atoms';
 import { AiCallout, EmptyState, UnderlineTabs } from '@/components/molecules';
@@ -51,10 +53,15 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { getService, updateService, notes, activities, addNote, addActivity, role, actorName } =
+  const { getService, updateService, notes, activities, addNote, addActivity, addNotification } =
     useServiceStore();
+  const { actor } = useSession();
+  const actorName = actor.name;
 
-  const service = getService(serviceId);
+  // Staf hanya boleh membuka layanan yang ditugaskan kepadanya (termasuk lewat notifikasi/tautan).
+  const found = getService(serviceId);
+  const forbidden = !!found && !canViewService(actor, found);
+  const service = found && !forbidden ? found : undefined;
   const serviceNotes = notes[serviceId] ?? [];
   const serviceActivities = activities[serviceId] ?? [];
 
@@ -69,8 +76,13 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
       <View style={styles.screen}>
         <AppHeader title="Detail Layanan" onBack={onBack} />
         <EmptyState
-          title="Layanan tidak ditemukan"
-          description="Layanan ini mungkin sudah dihapus atau tautannya tidak valid."
+          icon={forbidden ? 'lock-closed-outline' : undefined}
+          title={forbidden ? 'Anda tidak memiliki akses' : 'Layanan tidak ditemukan'}
+          description={
+            forbidden
+              ? 'Layanan ini tidak ditugaskan kepada Anda.'
+              : 'Layanan ini mungkin sudah dihapus atau tautannya tidak valid.'
+          }
           actionLabel="Kembali"
           onActionPress={onBack}
         />
@@ -97,6 +109,16 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
       progressPercent: result.progressPercent,
     });
     addActivity(service.id, buildStageActivity(service, result, actorName, input.note));
+    // Alur pemeriksaan: Staf menyelesaikan draf → Notaris diberi tahu untuk memeriksa.
+    if (!isNotaris(actor) && result.targetStage === 'Penyelesaian Draf') {
+      addNotification({
+        serviceId: service.id,
+        title: 'Draf siap diperiksa',
+        text: `${actorName} menyelesaikan draf ${service.code}.`,
+        tone: 'info',
+        audience: 'Notaris',
+      });
+    }
     closeSheet();
     setTab('Riwayat');
     showToast('Perubahan berhasil disimpan');
@@ -105,12 +127,22 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
   const saveNote = () => {
     const text = noteDraft.text.trim();
     if (!text) return;
-    addNote(service.id, { category: noteDraft.category, text });
+    addNote(service.id, { category: noteDraft.category, text }, actorName);
     addActivity(service.id, {
       title: noteDraft.category === 'Kendala' ? 'Kendala baru dicatat' : 'Catatan ditambahkan',
       text: `${actorName}: ${text}`,
       tone: noteDraft.category === 'Kendala' ? 'amber' : 'blue',
     });
+    // Kendala yang dicatat Staf langsung diteruskan ke Notaris.
+    if (noteDraft.category === 'Kendala' && !isNotaris(actor)) {
+      addNotification({
+        serviceId: service.id,
+        title: 'Kendala baru ditambahkan',
+        text: `${actorName} menambahkan kendala pada ${service.code}.`,
+        tone: 'warning',
+        audience: 'Notaris',
+      });
+    }
     setNoteDraft(EMPTY_DRAFT);
     closeSheet();
     setTab('Catatan');
@@ -128,6 +160,17 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
       text: `${actorName} menugaskan ${staffName} dengan target ${TIMELINE_DATE(dueDate)}.`,
       tone: 'blue',
     });
+    // Staf yang baru ditugaskan mendapat pemberitahuan.
+    if (staffName !== service.assignedStaff.name) {
+      addNotification({
+        serviceId: service.id,
+        title: 'Layanan ditugaskan kepada Anda',
+        text: `${service.code} · ${service.clientName}`,
+        tone: 'info',
+        audience: 'Staf',
+        recipient: staffName,
+      });
+    }
     closeSheet();
     showToast('Perubahan berhasil disimpan');
   };
@@ -166,7 +209,7 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
               <AssignmentCard
                 service={service}
                 supportName={supportStaffName}
-                canEdit={role === 'Notaris'}
+                canEdit={canAssignService(actor)}
                 onEdit={() => setSheet('assignment')}
               />
               <AiCallout onPress={() => openAi(null)} />

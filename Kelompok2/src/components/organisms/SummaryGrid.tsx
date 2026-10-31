@@ -25,7 +25,7 @@ export function SummaryGrid({ summary, onSelect }: SummaryGridProps) {
           type="completed"
           count={summary.completedCount}
           label="Layanan Selesai"
-          footerText="Bulan ini"
+          footerText="Total"
           onPress={() => onSelect('Selesai')}
         />
       </View>
@@ -41,7 +41,11 @@ export function SummaryGrid({ summary, onSelect }: SummaryGridProps) {
           type="attention"
           count={summary.attentionCount}
           label="Perlu Perhatian"
-          footerText={`${summary.newIssueCount} kendala baru`}
+          footerText={
+            summary.newIssueCount > 0
+              ? `${summary.newIssueCount} kendala tercatat`
+              : 'Tidak ada kendala'
+          }
           onPress={() => onSelect('Perlu Perhatian')}
         />
       </View>

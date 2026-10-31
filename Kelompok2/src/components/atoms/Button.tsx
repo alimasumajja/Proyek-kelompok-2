@@ -46,7 +46,16 @@ export function Button({
         disabled && styles.disabled,
       ]}>
       {icon ? <Ionicons name={icon} size={18} color={fg} /> : null}
-      <AppText variant="heading" color={fg}>
+      {/* Teks satu baris yang boleh menyusut: tidak meluap saat dua tombol berbagi satu baris
+          atau saat pengguna memakai ukuran huruf sistem yang besar. */}
+      <AppText
+        variant="heading"
+        color={fg}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+        maxFontSizeMultiplier={1.2}
+        style={styles.label}>
         {label}
       </AppText>
     </Pressable>
@@ -61,8 +70,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  full: { paddingVertical: 14, alignSelf: 'stretch' },
+  full: { paddingVertical: 14, paddingHorizontal: 12, alignSelf: 'stretch' },
   compact: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.md },
+  label: { flexShrink: 1 },
   pressed: { opacity: 0.88 },
   disabled: { opacity: 0.6 },
 });

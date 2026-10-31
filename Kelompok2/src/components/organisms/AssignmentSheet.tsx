@@ -35,7 +35,7 @@ function AssignmentForm({ service, onSave }: Pick<AssignmentSheetProps, 'service
   const submit = () => {
     const dueDate = parseInputDate(dateText);
     if (!dueDate) {
-      setError('Tanggal tidak valid. Gunakan format HH-BB-TTTT.');
+      setError('Pilih tanggal target penyelesaian.');
       return;
     }
     onSave({ staffName, dueDate });

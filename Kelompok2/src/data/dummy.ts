@@ -3,19 +3,11 @@ import type {
   ActivityItem,
   ServiceActivity,
   ServiceNote,
+  ServiceType,
   NearestDeadline,
   NotificationItem,
-  OperationalSummary,
   ServiceItem,
 } from '@/types/service';
-
-export const operationalSummaryData: OperationalSummary = {
-  activeCount: 24,
-  completedCount: 12,
-  lateCount: 3,
-  attentionCount: 5,
-  newIssueCount: 2,
-};
 
 export const servicesData: ServiceItem[] = [
   {
@@ -30,6 +22,7 @@ export const servicesData: ServiceItem[] = [
       initials: 'AP',
     },
     dueDate: '18 Mar 2026',
+    receivedDate: '23 Feb 2026',
     status: 'Aktif',
     priority: 'Sedang',
   },
@@ -45,6 +38,7 @@ export const servicesData: ServiceItem[] = [
       initials: 'RA',
     },
     dueDate: '14 Mar 2026',
+    receivedDate: '23 Feb 2026',
     status: 'Perlu Perhatian',
     priority: 'Tinggi',
   },
@@ -60,6 +54,7 @@ export const servicesData: ServiceItem[] = [
       initials: 'AP',
     },
     dueDate: '10 Mar 2026',
+    receivedDate: '23 Feb 2026',
     status: 'Terlambat',
     priority: 'Tinggi',
   },
@@ -75,6 +70,7 @@ export const servicesData: ServiceItem[] = [
       initials: 'RA',
     },
     dueDate: '8 Mar 2026',
+    receivedDate: '23 Feb 2026',
     status: 'Selesai',
     priority: 'Rendah',
   },
@@ -95,6 +91,7 @@ export const nearestDeadlineData: NearestDeadline = {
 export const recentActivitiesData: ActivityItem[] = [
   {
     id: 'act-1',
+    serviceId: '3',
     actor: 'Andi',
     action: 'memperbarui tahap',
     description: 'LAY-2026-0023 · Proses Pendaftaran',
@@ -103,6 +100,7 @@ export const recentActivitiesData: ActivityItem[] = [
   },
   {
     id: 'act-2',
+    serviceId: '2',
     actor: 'Rina',
     action: 'menambahkan kendala',
     description: 'Menunggu konfirmasi jadwal para pihak',
@@ -111,6 +109,7 @@ export const recentActivitiesData: ActivityItem[] = [
   },
   {
     id: 'act-3',
+    serviceId: '4',
     actor: 'Layanan',
     action: 'telah selesai',
     description: 'LAY-2026-0024 · Maya Puspitasari',
@@ -286,3 +285,15 @@ export const serviceActivitiesData: Record<string, ServiceActivity[]> = Object.f
     ] satisfies ServiceActivity[],
   ])
 );
+
+/** Jenis layanan awal (sama dengan daftar yang sebelumnya tertulis tetap di formulir Tambah Layanan). */
+export const serviceTypesData: ServiceType[] = [
+  'Pendirian Perseroan Terbatas',
+  'Akta Jual Beli',
+  'Legalisasi',
+  'Pendaftaran Hak Tanggungan',
+  'Waarmerking',
+  'Perjanjian Kredit',
+  'Akta Hibah',
+  'Akta Wasiat',
+].map((name, i) => ({ id: `JL-${i + 1}`, name, active: true }));

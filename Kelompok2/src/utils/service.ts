@@ -1,5 +1,13 @@
 import { PRIORITY_WEIGHT, STATUS_DASHBOARD_ORDER } from '@/constants/service';
-import type { FilterState, ServiceItem, ServiceTab } from '@/types/service';
+import type {
+  FilterState,
+  NearestDeadline,
+  OperationalSummary,
+  ServiceItem,
+  ServiceSort,
+  ServiceTab,
+} from '@/types/service';
+import { monthShortUpper, parseDisplayDate } from '@/utils/date';
 
 export const ALL_TABS: ServiceTab[] = ['Semua', 'Aktif', 'Terlambat', 'Selesai'];
 
@@ -17,7 +25,7 @@ export const INITIAL_FILTER: FilterState = {
   stage: null,
   staff: null,
   priority: null,
-  sortByPriority: false,
+  sort: 'default',
 };
 
 /** Sesuai referensi Figma: tab "Aktif" mencakup layanan "Perlu Perhatian". */
@@ -54,10 +62,24 @@ export function filterServices(services: ServiceItem[], f: FilterState): Service
       (f.priority === null || item.priority === f.priority)
   );
 
-  if (!f.sortByPriority) return result;
-  return [...result].sort(
-    (a, b) => PRIORITY_WEIGHT[b.priority ?? 'Rendah'] - PRIORITY_WEIGHT[a.priority ?? 'Rendah']
-  );
+  return sortServices(result, f.sort);
+}
+
+/**
+ * Mengurutkan layanan. Stabil: layanan yang setara tetap mengikuti urutan awalnya.
+ * - priority: Tinggi → Sedang → Rendah (tanpa prioritas dianggap Rendah)
+ * - due: tenggat paling awal dahulu; tanpa target di paling bawah
+ */
+export function sortServices(services: ServiceItem[], sort: ServiceSort): ServiceItem[] {
+  if (sort === 'default') return services;
+  const key = (s: ServiceItem): number =>
+    sort === 'priority'
+      ? -PRIORITY_WEIGHT[s.priority ?? 'Rendah']
+      : (parseDisplayDate(s.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER);
+  return services
+    .map((service, index) => ({ service, index }))
+    .sort((a, b) => key(a.service) - key(b.service) || a.index - b.index)
+    .map((x) => x.service);
 }
 
 /** Layanan yang perlu diprioritaskan di dashboard: terlambat dahulu, lalu perlu perhatian (PRD §6.2). */
@@ -74,6 +96,16 @@ export function getStaffNames(services: ServiceItem[]): string[] {
 
 export function hasAdvancedFilters(f: FilterState): boolean {
   return f.stage !== null || f.staff !== null || f.priority !== null;
+}
+
+/** Jumlah filter lanjutan yang aktif (untuk lencana pada tombol filter). */
+export function countAdvancedFilters(f: FilterState): number {
+  return [f.stage, f.staff, f.priority].filter((v) => v !== null).length;
+}
+
+/** Ada filter apa pun yang aktif (tab selain Semua, kata kunci, atau filter lanjutan)? Urutan tidak dihitung. */
+export function hasActiveFilters(f: FilterState): boolean {
+  return f.tab !== 'Semua' || f.query.trim().length > 0 || hasAdvancedFilters(f);
 }
 
 export function clampPercent(value: number): number {
@@ -98,4 +130,65 @@ export function getInitials(name: string): string {
 /** Validasi email sederhana untuk formulir Profil (cukup untuk MVP; backend memvalidasi ulang). */
 export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+/**
+ * Ringkasan Beranda dihitung dari daftar layanan yang sama dengan halaman Layanan,
+ * sehingga angka kartu selalu sama dengan jumlah hasil saat kartu diketuk.
+ *
+ * Definisi (sama dengan filter tab di filterServices):
+ * - Aktif            = status Aktif + Perlu Perhatian (belum selesai & belum terlambat)
+ * - Terlambat        = status Terlambat
+ * - Selesai          = status Selesai (dummy belum punya tanggal selesai, jadi tidak per-bulan)
+ * - Perlu Perhatian  = status Perlu Perhatian (bagian dari Aktif, disorot terpisah)
+ * - Kendala          = jumlah catatan berkategori Kendala pada layanan tersebut
+ */
+export function summarizeServices(
+  services: ServiceItem[],
+  issueCount: number
+): OperationalSummary {
+  const count = (status: ServiceItem['status']) => services.filter((s) => s.status === status).length;
+  return {
+    activeCount: count('Aktif') + count('Perlu Perhatian'),
+    completedCount: count('Selesai'),
+    lateCount: count('Terlambat'),
+    attentionCount: count('Perlu Perhatian'),
+    newIssueCount: issueCount,
+  };
+}
+
+/**
+ * Target terdekat: layanan berjalan (bukan terlambat/selesai) dengan tenggat paling awal.
+ * Layanan terlambat sudah ditampilkan terpisah di bagian prioritas (PRD §6.2).
+ */
+export function getNearestDeadline(services: ServiceItem[]): NearestDeadline | null {
+  const candidates = services
+    .filter((s) => s.status === 'Aktif' || s.status === 'Perlu Perhatian')
+    .map((service) => ({ service, due: parseDisplayDate(service.dueDate) }))
+    .filter((c): c is { service: ServiceItem; due: Date } => c.due !== null)
+    .sort((a, b) => a.due.getTime() - b.due.getTime());
+
+  const first = candidates[0];
+  if (!first) return null;
+  const { service, due } = first;
+  return {
+    serviceId: service.id,
+    day: String(due.getDate()),
+    month: monthShortUpper(due),
+    serviceType: service.serviceType,
+    clientAndStage: `${service.clientName} · ${service.currentStage}`,
+    staff: service.assignedStaff,
+  };
+}
+
+/** Penanda target kosong pada ServiceItem.dueDate (dipakai Tambah Layanan bila target tidak diisi). */
+export const NO_DUE_DATE = '-';
+
+export function hasDueDate(dueDate: string): boolean {
+  return dueDate !== NO_DUE_DATE && parseDisplayDate(dueDate) !== null;
+}
+
+/** Teks target untuk ditampilkan: tanggalnya, atau "Belum ditentukan". */
+export function formatDueDate(dueDate: string): string {
+  return hasDueDate(dueDate) ? dueDate : 'Belum ditentukan';
 }

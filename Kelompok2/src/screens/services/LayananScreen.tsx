@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NotaryColors } from '@/constants/notary-theme';
-import { useServiceStore } from '@/context/service-store';
+import { NotaryColors, Radius } from '@/constants/notary-theme';
+import { useSession } from '@/hooks/use-session';
 import { useServiceFilters } from '@/hooks/use-service-filters';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import type { ServiceItem, ServiceTab } from '@/types/service';
@@ -10,6 +10,7 @@ import { ALL_TABS, getStaffNames } from '@/utils/service';
 import { AppText, Chip } from '@/components/atoms';
 import {
   EmptyState,
+  InfoNote,
   NoticeBanner,
   SearchBar,
   SegmentedControl,
@@ -22,31 +23,39 @@ interface LayananScreenProps {
   initialTab?: ServiceTab;
   /** Berubah setiap navigasi masuk agar filter yang sama tetap diterapkan ulang. */
   requestKey?: string;
-  onAddService: () => void;
   /** Buka halaman Detail Layanan. */
   onOpenService: (serviceId: string) => void;
+  /** Buka Kelola Jenis Layanan (hanya ditampilkan untuk Notaris). */
+  onManageTypes?: () => void;
 }
 
-/** Halaman Layanan — PRD §6.5 & §6.11: daftar + bar progres, pencarian, dan filter. */
+/**
+ * Halaman Layanan — PRD §6.5 & §6.11: daftar + bar progres, pencarian, filter, dan urut prioritas.
+ * Filter menyaring (tab, kata kunci, tahap/staf/prioritas); "Urut prioritas" hanya menyusun ulang
+ * daftar dan jumlah layanan tidak berubah. Keduanya menampilkan statusnya secara jelas.
+ * Menambah layanan dilakukan lewat menu "Tambah" di bottom navigation, bukan dari header halaman ini.
+ */
 export function LayananScreen({
   initialTab = 'Semua',
   requestKey,
-  onAddService,
   onOpenService,
+  onManageTypes,
 }: LayananScreenProps) {
   useStatusBarStyle('dark');
-  const { services } = useServiceStore();
+  // Staf hanya mendapat layanan yang ditugaskan kepadanya (lihat utils/permissions).
+  const { services, isNotaris } = useSession();
   const staffOptions = useMemo(() => getStaffNames(services), [services]);
 
   const {
     filter,
     results,
-    advancedActive,
+    advancedCount,
+    anyFilterActive,
     setTab,
     setQuery,
     setAdvanced,
-    toggleSort,
-    reset,
+    setSort,
+    clearFilters,
   } = useServiceFilters(services, initialTab);
 
   const [filterOpen, setFilterOpen] = useState(false);
@@ -57,15 +66,22 @@ export function LayananScreen({
     setTab(initialTab);
   }, [initialTab, requestKey, setTab]);
 
-  const showReset = filter.tab !== 'Semua' || advancedActive || filter.query.length > 0;
+  const sortByPriority = filter.sort === 'priority';
 
   const header = (
     <View style={styles.header}>
+      {!isNotaris ? (
+        <InfoNote
+          tone="neutral"
+          icon="person-outline"
+          text="Menampilkan layanan yang ditugaskan kepada Anda."
+        />
+      ) : null}
       <SearchBar
         value={filter.query}
         onChangeText={setQuery}
         onFilterPress={() => setFilterOpen(true)}
-        filterActive={advancedActive}
+        filterCount={advancedCount}
       />
 
       {filter.tab === 'Perlu Perhatian' ? (
@@ -77,7 +93,7 @@ export function LayananScreen({
         />
       ) : null}
 
-      {advancedActive ? (
+      {anyFilterActive ? (
         <View style={styles.chips}>
           {filter.stage ? (
             <Chip label={filter.stage} onRemove={() => setAdvanced({ ...filter, stage: null })} />
@@ -91,6 +107,17 @@ export function LayananScreen({
               onRemove={() => setAdvanced({ ...filter, priority: null })}
             />
           ) : null}
+          <Pressable
+            onPress={clearFilters}
+            hitSlop={8}
+            style={styles.clearButton}
+            accessibilityRole="button"
+            accessibilityLabel="Hapus semua filter">
+            <Ionicons name="close-circle-outline" size={15} color={NotaryColors.primary} />
+            <AppText variant="label" color={NotaryColors.primary}>
+              Hapus filter
+            </AppText>
+          </Pressable>
         </View>
       ) : null}
 
@@ -101,24 +128,22 @@ export function LayananScreen({
           {results.length} layanan ditemukan
         </AppText>
         <Pressable
-          onPress={showReset ? reset : toggleSort}
-          hitSlop={8}
-          style={styles.sortButton}
-          accessibilityRole="button"
-          accessibilityLabel={
-            showReset
-              ? 'Reset semua filter'
-              : `Urutkan berdasarkan prioritas, ${filter.sortByPriority ? 'aktif' : 'nonaktif'}`
-          }>
+          onPress={() => setSort(sortByPriority ? 'default' : 'priority')}
+          hitSlop={6}
+          style={[styles.sortToggle, sortByPriority && styles.sortToggleActive]}
+          accessibilityRole="switch"
+          accessibilityLabel="Urut prioritas"
+          accessibilityHint="Menampilkan layanan berprioritas tinggi lebih dahulu"
+          accessibilityState={{ checked: sortByPriority }}>
           <Ionicons
-            name={showReset ? 'refresh-outline' : 'filter'}
+            name={sortByPriority ? 'checkmark' : 'swap-vertical'}
             size={14}
-            color={filter.sortByPriority && !showReset ? '#133E36' : '#2D6A4F'}
+            color={sortByPriority ? '#FFFFFF' : NotaryColors.textSecondary}
           />
           <AppText
             variant="label"
-            color={filter.sortByPriority && !showReset ? '#133E36' : '#265D4F'}>
-            {showReset ? 'Reset' : 'Prioritas'}
+            color={sortByPriority ? '#FFFFFF' : NotaryColors.textSecondary}>
+            Urut prioritas
           </AppText>
         </Pressable>
       </View>
@@ -129,7 +154,11 @@ export function LayananScreen({
     <View style={styles.screen}>
       <AppHeader
         title="Layanan"
-        action={{ icon: 'add', label: 'Tambah layanan baru', onPress: onAddService }}
+        action={
+          isNotaris && onManageTypes
+            ? { icon: 'settings-outline', label: 'Kelola jenis layanan', onPress: onManageTypes }
+            : undefined
+        }
       />
 
       <FlatList
@@ -145,8 +174,8 @@ export function LayananScreen({
                 ? `Tidak ada hasil untuk kata kunci "${filter.query}"`
                 : 'Coba ubah kata kunci atau filter pencarian Anda.'
             }
-            actionLabel={showReset ? 'Tampilkan Semua' : undefined}
-            onActionPress={reset}
+            actionLabel={anyFilterActive ? 'Hapus filter' : undefined}
+            onActionPress={clearFilters}
           />
         }
         contentContainerStyle={styles.list}
@@ -172,7 +201,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: NotaryColors.background },
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
   header: { gap: 12, marginBottom: 4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  clearButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 4 },
   subHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -180,5 +210,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginBottom: 2,
   },
-  sortButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
+  sortToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: NotaryColors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  sortToggleActive: { borderColor: NotaryColors.primary, backgroundColor: NotaryColors.primary },
 });

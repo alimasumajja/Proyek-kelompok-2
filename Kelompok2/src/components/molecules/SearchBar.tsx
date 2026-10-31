@@ -9,8 +9,8 @@ interface SearchBarProps {
   onChangeText: (text: string) => void;
   placeholder?: string;
   onFilterPress?: () => void;
-  /** Tombol filter menyala (hijau) saat ada filter lanjutan yang aktif. */
-  filterActive?: boolean;
+  /** Jumlah filter lanjutan aktif: tombol menyala (hijau) dan menampilkan lencana angkanya. */
+  filterCount?: number;
 }
 
 /** Kolom pencarian + tombol filter (referensi Figma: search-row). */
@@ -19,8 +19,9 @@ export function SearchBar({
   onChangeText,
   placeholder = 'Cari nomor, klien, atau jenis layanan',
   onFilterPress,
-  filterActive = false,
+  filterCount = 0,
 }: SearchBarProps) {
+  const filterActive = filterCount > 0;
   return (
     <View style={styles.row}>
       <View style={styles.input}>
@@ -48,7 +49,8 @@ export function SearchBar({
       <IconButton
         icon={filterActive ? 'filter' : 'options-outline'}
         onPress={onFilterPress}
-        accessibilityLabel="Filter layanan"
+        accessibilityLabel={filterActive ? `Filter layanan, ${filterCount} filter aktif` : 'Filter layanan'}
+        badgeCount={filterCount}
         boxSize={48}
         size={20}
         color={filterActive ? '#FFFFFF' : NotaryColors.textPrimary}

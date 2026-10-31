@@ -6,6 +6,9 @@ export type ServiceTab = 'Semua' | ServiceStatus;
 
 export type ServicePriority = 'Tinggi' | 'Sedang' | 'Rendah';
 
+/** Cara mengurutkan daftar layanan (terpisah dari filter). */
+export type ServiceSort = 'default' | 'priority' | 'due';
+
 export interface StaffRef {
   name: string;
   initials: string;
@@ -37,6 +40,8 @@ export interface OperationalSummary {
 
 export interface ActivityItem {
   id: string;
+  /** Layanan terkait; dipakai untuk menyaring aktivitas menurut hak akses. */
+  serviceId?: string;
   actor: string;
   action: string;
   description: string;
@@ -60,6 +65,10 @@ export interface NotificationItem {
   id: string;
   /** Layanan yang dibuka saat notifikasi diketuk. */
   serviceId?: string;
+  /** Bila diisi, hanya peran ini yang menerima notifikasi (kosong = semua peran). */
+  audience?: UserRole;
+  /** Bila diisi, hanya akun dengan nama ini yang menerima (mis. staf yang baru ditugaskan). */
+  recipient?: string;
   title: string;
   text: string;
   time: string;
@@ -73,7 +82,7 @@ export interface FilterState {
   stage: string | null;
   staff: string | null;
   priority: ServicePriority | null;
-  sortByPriority: boolean;
+  sort: ServiceSort;
 }
 
 export type UserRole = 'Notaris' | 'Staf';
@@ -109,3 +118,16 @@ export interface ServiceActivity {
 export type StageChangeKind = 'advance' | 'repeat' | 'skip';
 
 export type WorkflowStepState = 'done' | 'current' | 'skipped' | 'pending';
+
+/**
+ * Jenis layanan yang dapat diatur kantor (CRUD).
+ * `active = false` berarti tidak tersedia: tidak muncul di formulir Tambah Layanan,
+ * tetapi layanan lama yang memakainya tetap utuh.
+ */
+export interface ServiceType {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export type ActionResult = { ok: true } | { ok: false; error: string };

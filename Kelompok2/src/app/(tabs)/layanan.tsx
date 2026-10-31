@@ -11,8 +11,8 @@ export default function LayananRoute() {
     <LayananScreen
       initialTab={parseServiceTab(filter)}
       requestKey={ts}
-      onAddService={() => router.navigate('/(tabs)/tambah')}
       onOpenService={(id) => router.push({ pathname: '/layanan/[id]', params: { id } })}
+      onManageTypes={() => router.push('/jenis-layanan')}
     />
   );
 }

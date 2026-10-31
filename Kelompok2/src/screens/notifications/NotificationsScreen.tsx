@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useServiceStore } from '@/context/service-store';
+import { useSession } from '@/hooks/use-session';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import { EmptyState, NotificationRow } from '@/components/molecules';
 import { AppHeader } from '@/components/organisms';
@@ -15,7 +16,9 @@ interface NotificationsScreenProps {
 export function NotificationsScreen({ onBack, onOpenService }: NotificationsScreenProps) {
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
-  const { notifications, markAllNotificationsRead } = useServiceStore();
+  const { markAllNotificationsRead } = useServiceStore();
+  // Hanya notifikasi dari layanan yang boleh dilihat akun aktif.
+  const { notifications } = useSession();
 
   return (
     <View style={styles.screen}>

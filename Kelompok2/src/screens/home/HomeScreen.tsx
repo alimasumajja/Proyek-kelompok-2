@@ -3,17 +3,17 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useServiceStore } from '@/context/service-store';
 import {
-  currentUserData,
   nearestDeadlineData,
-  operationalSummaryData,
   recentActivitiesData,
   todayLabel,
 } from '@/data/dummy';
+import { useSession } from '@/hooks/use-session';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import type { ServiceItem, ServiceTab } from '@/types/service';
-import { getPriorityServices } from '@/utils/service';
-import { DeadlineCard, SectionHeader, ServiceCard } from '@/components/molecules';
+import { getNearestDeadline, getPriorityServices, summarizeServices } from '@/utils/service';
+import { DeadlineCard, EmptyState, SectionHeader, ServiceCard } from '@/components/molecules';
 import { ActivityTimeline, HomeHeader, SummaryGrid } from '@/components/organisms';
+import { StaffDashboard } from './StaffDashboard';
 
 interface HomeScreenProps {
   /** Pindah ke tab Layanan dengan filter tertentu. */
@@ -22,6 +22,8 @@ interface HomeScreenProps {
   onOpenService: (serviceId: string) => void;
   onOpenNotifications: () => void;
   onOpenProfile: () => void;
+  /** Buka formulir Tambah Layanan (dipakai dashboard Staf). */
+  onAddService?: () => void;
 }
 
 /**
@@ -33,30 +35,55 @@ export function HomeScreen({
   onOpenService,
   onOpenNotifications,
   onOpenProfile,
+  onAddService,
 }: HomeScreenProps) {
   useStatusBarStyle('light');
-  const { services, unreadCount } = useServiceStore();
+  const { notes } = useServiceStore();
+  const { account, isNotaris, services, unreadCount } = useSession();
 
+  // Staf memiliki dashboard tersendiri (tugas saya), bukan ringkasan kantor.
+  if (!isNotaris) {
+    return (
+      <StaffDashboard
+        onNavigateToServices={onNavigateToServices}
+        onOpenService={onOpenService}
+        onOpenNotifications={onOpenNotifications}
+        onOpenProfile={onOpenProfile}
+        onAddService={onAddService ?? (() => onNavigateToServices('Semua'))}
+      />
+    );
+  }
+
+  // `services` hanya berisi layanan yang boleh dilihat akun aktif (Staf: yang ditugaskan padanya).
   const priorityServices = getPriorityServices(services);
   const openService = (service: ServiceItem) => onOpenService(service.id);
+  const visibleIds = new Set(services.map((s) => s.id));
 
-  // Jumlah aktif mengikuti data layanan; angka lain masih dummy statis (nanti dari backend).
-  const summary = {
-    ...operationalSummaryData,
-    activeCount:
-      operationalSummaryData.activeCount -
-      3 +
-      services.filter((s) => s.status !== 'Selesai').length,
-  };
+  // Ringkasan dihitung dari layanan yang boleh dilihat akun aktif (Notaris: semua, Staf: miliknya),
+  // dari data yang sama dengan halaman Layanan.
+  const issueCount = services.reduce(
+    (total, s) => total + (notes[s.id] ?? []).filter((n) => n.category === 'Kendala').length,
+    0
+  );
+  const summary = summarizeServices(services, issueCount);
+
+  const deadline = isNotaris ? nearestDeadlineData : getNearestDeadline(services);
+  const activities = isNotaris
+    ? recentActivitiesData
+    : recentActivitiesData.filter((a) => a.serviceId && visibleIds.has(a.serviceId));
 
   return (
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <HomeHeader
           dateLabel={todayLabel}
-          greeting={`Selamat pagi, ${currentUserData.firstName}`}
-          subtitle="Berikut ringkasan operasional kantor hari ini."
-          userInitials={currentUserData.initials}
+          greeting={`Selamat pagi, ${account.name.split(' ')[0]}`}
+          subtitle={
+            isNotaris
+              ? 'Berikut ringkasan operasional kantor hari ini.'
+              : 'Berikut ringkasan tugas Anda hari ini.'
+          }
+          userInitials={account.initials}
           unreadCount={unreadCount}
           onNotificationPress={onOpenNotifications}
           onAvatarPress={onOpenProfile}
@@ -74,22 +101,34 @@ export function HomeScreen({
             actionAccessibilityLabel="Lihat semua layanan yang perlu perhatian"
             onActionPress={() => onNavigateToServices('Perlu Perhatian')}
           />
-          {priorityServices.map((service) => (
-            <ServiceCard key={service.id} item={service} onPress={openService} />
-          ))}
+          {priorityServices.length > 0 ? (
+            priorityServices.map((service) => (
+              <ServiceCard key={service.id} item={service} onPress={openService} />
+            ))
+          ) : (
+            <EmptyState
+              icon="checkmark-circle-outline"
+              title="Tidak ada layanan yang perlu perhatian"
+            />
+          )}
         </View>
 
         <View style={styles.section}>
           <SectionHeader eyebrow="DEADLINE" title="Target Terdekat" />
-          <DeadlineCard
-            item={nearestDeadlineData}
-            onPress={() => onOpenService(nearestDeadlineData.serviceId)}
-          />
+          {deadline ? (
+            <DeadlineCard item={deadline} onPress={() => onOpenService(deadline.serviceId)} />
+          ) : (
+            <EmptyState icon="calendar-outline" title="Belum ada target mendatang" />
+          )}
         </View>
 
         <View style={styles.section}>
           <SectionHeader eyebrow="AKTIVITAS" title="Aktivitas Terbaru" />
-          <ActivityTimeline items={recentActivitiesData} />
+          {activities.length > 0 ? (
+            <ActivityTimeline items={activities} />
+          ) : (
+            <EmptyState icon="time-outline" title="Belum ada aktivitas" />
+          )}
         </View>
       </ScrollView>
     </View>

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NotaryColors } from '@/constants/notary-theme';
 import type { ServiceItem, ServiceStatus } from '@/types/service';
+import { hasDueDate } from '@/utils/service';
 import { AppText, Avatar, Badge, type BadgeTone } from '../atoms';
 
 const HERO_TONE: Record<ServiceStatus, BadgeTone> = {
@@ -36,7 +37,7 @@ export function ServiceHero({ service }: { service: ServiceItem }) {
         <View style={styles.metaItem}>
           <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.8)" />
           <AppText variant="caption" color="rgba(255,255,255,0.9)">
-            Target {service.dueDate}
+            {hasDueDate(service.dueDate) ? `Target ${service.dueDate}` : 'Target belum ditentukan'}
           </AppText>
         </View>
         <View style={styles.metaItem}>
