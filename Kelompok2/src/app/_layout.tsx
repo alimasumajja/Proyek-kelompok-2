@@ -52,6 +52,7 @@ export default function RootLayout() {
               {/* Halaman turunan (tanpa bottom navigation) */}
               <Stack.Screen name="layanan/[id]" />
               <Stack.Screen name="notifikasi" />
+            <Stack.Screen name="jenis-layanan" />
               <Stack.Screen name="profile/staf" />
             </Stack>
           </ToastProvider>

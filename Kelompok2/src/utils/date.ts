@@ -24,3 +24,22 @@ export function parseInputDate(value: string): Date | null {
   const valid = date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
   return valid ? date : null;
 }
+
+/** "14 Mar 2026" → Date, atau null bila tidak dikenali (mis. "Belum ditentukan"). */
+export function parseDisplayDate(display: string): Date | null {
+  const [day, month, year] = display.split(' ');
+  const monthIndex = MONTHS_SHORT.indexOf(month);
+  if (!day || monthIndex < 0 || !year) return null;
+  const date = new Date(Number(year), monthIndex, Number(day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Singkatan bulan kapital, mis. "MAR". */
+export function monthShortUpper(date: Date): string {
+  return MONTHS_SHORT[date.getMonth()].toUpperCase();
+}
+
+/** Date → "18-03-2026" (nilai kolom tanggal). Kebalikan dari parseInputDate. */
+export function formatInputDate(date: Date): string {
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}`;
+}

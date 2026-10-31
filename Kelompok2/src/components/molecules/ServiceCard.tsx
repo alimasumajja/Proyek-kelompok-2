@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NotaryColors, Shadow } from '@/constants/notary-theme';
 import type { ServiceItem } from '@/types/service';
-import { formatPercent } from '@/utils/service';
+import { formatDueDate, formatPercent } from '@/utils/service';
 import { AppText, Avatar, ProgressBar } from '../atoms';
 import { StatusBadge } from './StatusBadge';
 
@@ -60,7 +60,7 @@ export function ServiceCard({ item, onPress }: ServiceCardProps) {
         <View style={styles.meta}>
           <Ionicons name="calendar-outline" size={14} color={NotaryColors.textSecondary} />
           <AppText variant="caption" color="#4B5563">
-            {item.dueDate}
+            {formatDueDate(item.dueDate)}
           </AppText>
         </View>
       </View>

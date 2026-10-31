@@ -20,3 +20,4 @@ export { NotificationSettingsSheet } from './NotificationSettingsSheet';
 export { ProfileSummaryCard } from './ProfileSummaryCard';
 export { AccountDemoCard } from './AccountDemoCard';
 export { StaffFormSheet, type StaffFormInput } from './StaffFormSheet';
+export { ServiceTypeFormSheet } from './ServiceTypeFormSheet';

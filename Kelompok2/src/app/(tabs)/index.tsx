@@ -20,6 +20,7 @@ export default function BerandaRoute() {
       onOpenService={(id) => router.push({ pathname: '/layanan/[id]', params: { id } })}
       onOpenNotifications={() => router.push('/notifikasi')}
       onOpenProfile={() => router.navigate('/(tabs)/profil')}
+      onAddService={() => router.navigate('/(tabs)/tambah')}
     />
   );
 }

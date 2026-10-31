@@ -1,12 +1,15 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import {
   notificationsData,
+  serviceTypesData,
   serviceActivitiesData,
   serviceNotesData,
   servicesData,
 } from '@/data/dummy';
 import { SERVICE_STAGES } from '@/constants/service';
 import type {
+  ActionResult,
+  ServiceType,
   NotificationItem,
   ServiceActivity,
   ServiceItem,
@@ -16,6 +19,12 @@ import type {
   UserRole,
 } from '@/types/service';
 import { formatDateId } from '@/utils/date';
+import { NO_DUE_DATE } from '@/utils/service';
+import {
+  countServicesUsingType,
+  normalizeServiceTypeName,
+  validateServiceTypeName,
+} from '@/utils/service-types';
 
 type NewNote = Pick<ServiceNote, 'category' | 'text'>;
 type NewActivity = Pick<ServiceActivity, 'title' | 'text' | 'tone'>;
@@ -30,6 +39,8 @@ export interface NewServiceInput {
   dueDate?: Date;
   clientContact?: string;
   description?: string;
+  /** Nama akun yang mencatat; jika kosong memakai nama bawaan peran. */
+  createdBy?: string;
 }
 
 interface ServiceStoreValue {
@@ -44,10 +55,23 @@ interface ServiceStoreValue {
   setRole: (role: UserRole) => void;
   getService: (id: string) => ServiceItem | undefined;
   addService: (input: NewServiceInput) => ServiceItem;
+  /** Semua jenis layanan (termasuk yang tidak tersedia). */
+  serviceTypes: ServiceType[];
+  /** Nama jenis yang tersedia untuk dipilih di formulir Tambah Layanan. */
+  activeServiceTypeNames: string[];
+  addServiceType: (name: string) => ActionResult;
+  /** Mengubah nama; layanan yang memakai nama lama ikut diperbarui. */
+  renameServiceType: (id: string, name: string) => ActionResult;
+  setServiceTypeActive: (id: string, active: boolean) => void;
+  /** Hanya boleh bila tidak ada layanan yang memakainya. */
+  deleteServiceType: (id: string) => ActionResult;
   updateService: (service: ServiceItem) => void;
-  addNote: (serviceId: string, note: NewNote) => void;
+  /** `author` = nama akun aktif; jika kosong memakai nama bawaan peran. */
+  addNote: (serviceId: string, note: NewNote, author?: string) => void;
   addActivity: (serviceId: string, activity: NewActivity) => void;
   markAllNotificationsRead: () => void;
+  /** Menambah notifikasi baru (tampil paling atas, belum dibaca). */
+  addNotification: (n: Omit<NotificationItem, 'id' | 'time' | 'read'>) => void;
 }
 
 const ServiceStoreContext = createContext<ServiceStoreValue | null>(null);
@@ -71,6 +95,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
   const [activities, setActivities] = useState(serviceActivitiesData);
   const [notifications, setNotifications] = useState(notificationsData);
   const [role, setRole] = useState<UserRole>('Notaris');
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>(serviceTypesData);
 
   const getService = useCallback(
     (id: string) => services.find((s) => s.id === id),
@@ -85,7 +110,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         return Number.isFinite(n) ? Math.max(max, n) : max;
       }, 0);
       const code = `LAY-${input.receivedDate.getFullYear()}-${String(lastNumber + 1).padStart(4, '0')}`;
-      const actor = ACTOR_BY_ROLE[role];
+      const actor = input.createdBy ?? ACTOR_BY_ROLE[role];
 
       const created: ServiceItem = {
         id: nextId('S'),
@@ -95,7 +120,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         currentStage: SERVICE_STAGES[0], // tahap awal selalu "Penerimaan Berkas"
         progressPercent: 0,
         assignedStaff: input.assignedStaff,
-        dueDate: input.dueDate ? formatDateId(input.dueDate) : '-',
+        dueDate: input.dueDate ? formatDateId(input.dueDate) : NO_DUE_DATE,
         status: 'Aktif',
         priority: input.priority,
         receivedDate: formatDateId(input.receivedDate),
@@ -133,6 +158,23 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         };
         setNotes((prev) => ({ ...prev, [created.id]: [note] }));
       }
+      // Staf yang ditugaskan (bukan pembuat) mendapat pemberitahuan.
+      if (input.assignedStaff.name !== actor) {
+        setNotifications((prev) => [
+          {
+            id: nextId('NT'),
+            serviceId: created.id,
+            title: 'Layanan baru ditugaskan kepada Anda',
+            text: `${code} · ${input.clientName}`,
+            time: 'Baru saja',
+            tone: 'info',
+            read: false,
+            audience: 'Staf',
+            recipient: input.assignedStaff.name,
+          },
+          ...prev,
+        ]);
+      }
       return created;
     },
     [services, role]
@@ -143,11 +185,11 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const addNote = useCallback(
-    (serviceId: string, note: NewNote) => {
+    (serviceId: string, note: NewNote, author?: string) => {
       const created: ServiceNote = {
         id: nextId('N'),
         ...note,
-        author: ACTOR_BY_ROLE[role],
+        author: author ?? ACTOR_BY_ROLE[role],
         time: 'Baru saja',
       };
       setNotes((prev) => ({ ...prev, [serviceId]: [created, ...(prev[serviceId] ?? [])] }));
@@ -159,6 +201,73 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
     const created: ServiceActivity = { id: nextId('A'), ...activity, time: 'Baru saja' };
     setActivities((prev) => ({ ...prev, [serviceId]: [created, ...(prev[serviceId] ?? [])] }));
   }, []);
+
+  const addServiceType = useCallback(
+    (name: string): ActionResult => {
+      const error = validateServiceTypeName(name, serviceTypes);
+      if (error) return { ok: false, error };
+      const created: ServiceType = {
+        id: nextId('JL'),
+        name: normalizeServiceTypeName(name),
+        active: true,
+      };
+      setServiceTypes((prev) => [...prev, created]);
+      return { ok: true };
+    },
+    [serviceTypes]
+  );
+
+  const renameServiceType = useCallback(
+    (id: string, name: string): ActionResult => {
+      const target = serviceTypes.find((t) => t.id === id);
+      if (!target) return { ok: false, error: 'Jenis layanan tidak ditemukan' };
+      const error = validateServiceTypeName(name, serviceTypes, id);
+      if (error) return { ok: false, error };
+      const next = normalizeServiceTypeName(name);
+      setServiceTypes((prev) => prev.map((t) => (t.id === id ? { ...t, name: next } : t)));
+      // Layanan lama mengikuti nama baru agar tidak terpisah dari jenisnya.
+      setServices((prev) =>
+        prev.map((s) => (s.serviceType === target.name ? { ...s, serviceType: next } : s))
+      );
+      return { ok: true };
+    },
+    [serviceTypes]
+  );
+
+  const setServiceTypeActive = useCallback((id: string, active: boolean) => {
+    setServiceTypes((prev) => prev.map((t) => (t.id === id ? { ...t, active } : t)));
+  }, []);
+
+  const deleteServiceType = useCallback(
+    (id: string): ActionResult => {
+      const target = serviceTypes.find((t) => t.id === id);
+      if (!target) return { ok: false, error: 'Jenis layanan tidak ditemukan' };
+      const used = countServicesUsingType(services, target.name);
+      if (used > 0)
+        return {
+          ok: false,
+          error: `Masih dipakai ${used} layanan. Nonaktifkan saja agar tidak muncul di formulir.`,
+        };
+      setServiceTypes((prev) => prev.filter((t) => t.id !== id));
+      return { ok: true };
+    },
+    [serviceTypes, services]
+  );
+
+  const activeServiceTypeNames = useMemo(
+    () => serviceTypes.filter((t) => t.active).map((t) => t.name),
+    [serviceTypes]
+  );
+
+  const addNotification = useCallback(
+    (n: Omit<NotificationItem, 'id' | 'time' | 'read'>) => {
+      setNotifications((prev) => [
+        { id: nextId('NT'), time: 'Baru saja', read: false, ...n },
+        ...prev,
+      ]);
+    },
+    []
+  );
 
   const markAllNotificationsRead = useCallback(
     () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))),
@@ -183,6 +292,13 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       addNote,
       addActivity,
       markAllNotificationsRead,
+      addNotification,
+      serviceTypes,
+      activeServiceTypeNames,
+      addServiceType,
+      renameServiceType,
+      setServiceTypeActive,
+      deleteServiceType,
     }),
     [
       services,
@@ -197,6 +313,13 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       addNote,
       addActivity,
       markAllNotificationsRead,
+      addNotification,
+      serviceTypes,
+      activeServiceTypeNames,
+      addServiceType,
+      renameServiceType,
+      setServiceTypeActive,
+      deleteServiceType,
     ]
   );
 

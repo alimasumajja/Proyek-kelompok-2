@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { FilterState, ServiceItem, ServiceTab } from '@/types/service';
-import { filterServices, hasAdvancedFilters, INITIAL_FILTER } from '@/utils/service';
+import type { FilterState, ServiceItem, ServiceSort, ServiceTab } from '@/types/service';
+import {
+  countAdvancedFilters,
+  filterServices,
+  hasActiveFilters,
+  hasAdvancedFilters,
+  INITIAL_FILTER,
+} from '@/utils/service';
 
 /** State & hasil filter/pencarian daftar layanan (logika murni ada di utils/service). */
 export function useServiceFilters(services: ServiceItem[], initialTab: ServiceTab = 'Semua') {
@@ -15,20 +21,23 @@ export function useServiceFilters(services: ServiceItem[], initialTab: ServiceTa
       setFilter((f) => ({ ...f, ...next })),
     []
   );
-  const toggleSort = useCallback(
-    () => setFilter((f) => ({ ...f, sortByPriority: !f.sortByPriority })),
+  const setSort = useCallback((sort: ServiceSort) => setFilter((f) => ({ ...f, sort })), []);
+  /** Menghapus semua filter (tab, kata kunci, filter lanjutan). Pilihan urutan tetap dipertahankan. */
+  const clearFilters = useCallback(
+    () => setFilter((f) => ({ ...INITIAL_FILTER, sort: f.sort })),
     []
   );
-  const reset = useCallback(() => setFilter(INITIAL_FILTER), []);
 
   return {
     filter,
     results,
     advancedActive: hasAdvancedFilters(filter),
+    advancedCount: countAdvancedFilters(filter),
+    anyFilterActive: hasActiveFilters(filter),
     setTab,
     setQuery,
     setAdvanced,
-    toggleSort,
-    reset,
+    setSort,
+    clearFilters,
   };
 }

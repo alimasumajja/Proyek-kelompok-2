@@ -5,11 +5,15 @@ import { NotaryColors, Radius } from '@/constants/notary-theme';
 import { AppText } from '../atoms';
 import { FormField } from './FormField';
 
-interface SelectFieldProps<T extends string> {
+export interface SelectFieldProps<T extends string> {
   label: string;
-  value: T;
+  /** '' = belum memilih (menampilkan placeholder). */
+  value: T | '';
   options: readonly T[];
   onChange: (value: T) => void;
+  required?: boolean;
+  placeholder?: string;
+  error?: string;
 }
 
 /**
@@ -21,20 +25,26 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
+  required,
+  placeholder = 'Pilih',
+  error,
 }: SelectFieldProps<T>) {
   const [open, setOpen] = useState(false);
 
   return (
-    <FormField label={label}>
+    <FormField label={label} required={required} error={error}>
       <Pressable
         onPress={() => setOpen((o) => !o)}
         accessibilityRole="combobox"
         accessibilityLabel={label}
-        accessibilityValue={{ text: value }}
+        accessibilityValue={{ text: value || placeholder }}
         accessibilityState={{ expanded: open }}
-        style={[styles.field, open && styles.fieldOpen]}>
-        <AppText variant="bodyStrong" style={styles.value}>
-          {value}
+        style={[styles.field, open && styles.fieldOpen, !!error && styles.fieldInvalid]}>
+        <AppText
+          variant="bodyStrong"
+          color={value ? NotaryColors.textPrimary : '#9CA3AF'}
+          style={styles.value}>
+          {value || placeholder}
         </AppText>
         <Ionicons
           name={open ? 'chevron-up' : 'chevron-down'}
@@ -87,6 +97,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   fieldOpen: { borderColor: NotaryColors.primary },
+  fieldInvalid: { borderColor: NotaryColors.danger },
   value: { flex: 1 },
   list: {
     borderRadius: Radius.md,
