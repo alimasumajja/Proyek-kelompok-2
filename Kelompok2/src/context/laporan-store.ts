@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import type { Akta, AktaInput, LaporanSummary, ValidasiItem } from '@/types/laporan';
+import type {Akta, AktaInput, DokumenLaporan, LaporanSummary, NamaTemplate, ValidasiItem,} from '@/types/laporan';
 import { formatDateId, parseInputDate } from '@/utils/date';
 
 /**
@@ -124,6 +124,10 @@ interface LaporanState {
   akta: Akta[];
   kategoriKosong: string[];
   diperbarui: Date;
+    /** Status dokumen laporan per periode (kunci: lihat `kunciPeriode`). */
+  dokumen: Record<string, DokumenLaporan>;
+  /** Template format dokumen yang sedang dipakai. */
+  templateId: NamaTemplate;
 }
 
 let state: LaporanState = {
@@ -132,6 +136,8 @@ let state: LaporanState = {
   akta: aktaData,
   kategoriKosong: [],
   diperbarui: new Date(),
+  dokumen: {},
+  templateId: 'Ringkas',
 };
 
 const listeners = new Set<() => void>();
@@ -175,6 +181,59 @@ export function updateAkta(id: string, input: AktaInput) {
 /** Nomor urut berikutnya (001, 002, ...) untuk form tambah akta. */
 export function nextNomorUrut(): string {
   return String(state.akta.length + 1).padStart(3, '0');
+}
+
+// ───────────────────────── Dokumen laporan: persetujuan & versi ─────────────────────────
+
+/** Dokumen untuk periode yang belum pernah disentuh. */
+const DOKUMEN_BARU: DokumenLaporan = {
+  status: 'Draf',
+  versiFinal: 0,
+  catatanRevisi: '',
+  snapshot: null,
+};
+
+/** Kunci penyimpanan dokumen per periode, mis. "2026-2" untuk Maret 2026. */
+export const kunciPeriode = (bulan: number, tahun: number) => `${tahun}-${bulan}`;
+
+/** Final → "1.0", "2.0". Selain itu → draf versi berikutnya: "0.1", "1.1". */
+export function labelVersi(dokumen: DokumenLaporan): string {
+  return dokumen.status === 'Final' ? `${dokumen.versiFinal}.0` : `${dokumen.versiFinal}.1`;
+}
+
+function patchDokumenAktif(patch: (lama: DokumenLaporan) => DokumenLaporan) {
+  const kunci = kunciPeriode(state.bulan, state.tahun);
+  const lama = state.dokumen[kunci] ?? DOKUMEN_BARU;
+  emit({ dokumen: { ...state.dokumen, [kunci]: patch(lama) } });
+}
+
+/** Menyetujui laporan periode aktif: status Final, versi naik, data dikunci sebagai snapshot. */
+export function setujuiLaporan(akta: Akta[], periodeLabel: string) {
+  patchDokumenAktif((lama) => ({
+    status: 'Final',
+    versiFinal: lama.versiFinal + 1,
+    catatanRevisi: '',
+    snapshot: { periodeLabel, disetujuiPada: new Date().toISOString(), akta: akta.map((a) => ({ ...a })) },
+  }));
+}
+
+/** Meminta revisi. Bila laporan sudah Final, versi final lama tetap tersimpan sebagai snapshot. */
+export function mintaRevisi(catatan: string) {
+  patchDokumenAktif((lama) => ({ ...lama, status: 'Revisi Diminta', catatanRevisi: catatan }));
+}
+
+export function setTemplate(templateId: NamaTemplate) {
+  emit({ templateId });
+}
+
+/** Status dokumen laporan pada periode yang sedang dilihat. */
+export function useDokumen(): { dokumen: DokumenLaporan; versi: string } {
+  const { bulan, tahun, dokumen } = useLaporanStore();
+
+  return useMemo(() => {
+    const aktif = dokumen[kunciPeriode(bulan, tahun)] ?? DOKUMEN_BARU;
+    return { dokumen: aktif, versi: labelVersi(aktif) };
+  }, [bulan, tahun, dokumen]);
 }
 
 // ───────────────────────── Hook ringkasan laporan ─────────────────────────

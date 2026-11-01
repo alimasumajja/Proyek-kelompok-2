@@ -4,11 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { NotaryColors, Radius, Shadow } from '@/constants/notary-theme';
 import { useLaporan } from '@/context/laporan-store';
+import { useIsiDokumen } from '@/hooks/use-isi-dokumen';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
-import { STATUS_VALIDASI_TONE, type ValidasiItem } from '@/types/laporan';
+import { STATUS_DOKUMEN_TONE, STATUS_VALIDASI_TONE, type ValidasiItem } from '@/types/laporan';
 import { clampPercent } from '@/utils/service';
 import { AppText, Badge, Button, IconButton } from '@/components/atoms';
 import { AppHeader } from '@/components/organisms';
+import { EksporSheet } from '@/components/laporan/DokumenSheets';
 import { PeriodeSheet, ValidasiKategoriSheet } from '@/components/laporan/LaporanSheets';
 
 // ───────────────────────── Cincin progres ─────────────────────────
@@ -304,19 +306,106 @@ const linkStyles = StyleSheet.create({
   texts: { flex: 1, gap: 2 },
 });
 
+// ───────────────────────── Kartu dokumen laporan ─────────────────────────
+
+interface DokumenCardProps {
+  onPratinjau: () => void;
+  onEkspor: () => void;
+}
+
+/** Bagian "Dokumen Laporan": status dokumen serta tombol Pratinjau dan Ekspor. */
+function DokumenCard({ onPratinjau, onEkspor }: DokumenCardProps) {
+  const { dokumen, versi, periodeLabel, jumlahAkta } = useIsiDokumen();
+
+  return (
+    <View style={dokumenStyles.wrap}>
+      <View style={dokumenStyles.header}>
+        <View>
+          <AppText variant="eyebrow" color={NotaryColors.textMuted}>
+            DOKUMEN LAPORAN
+          </AppText>
+          <AppText variant="title" accessibilityRole="header">
+            Pratinjau & Ekspor
+          </AppText>
+        </View>
+        <Badge label={dokumen.status} tone={STATUS_DOKUMEN_TONE[dokumen.status]} />
+      </View>
+
+      <View style={dokumenStyles.card}>
+        <View style={dokumenStyles.row}>
+          <View style={dokumenStyles.thumb} accessibilityElementsHidden>
+            <View style={dokumenStyles.thumbLogo} />
+            <View style={dokumenStyles.thumbGaris} />
+            <View style={[dokumenStyles.thumbGaris, dokumenStyles.thumbPendek]} />
+          </View>
+          <View style={dokumenStyles.texts}>
+            <Badge label={periodeLabel} tone="neutral" shape="square" />
+            <AppText variant="bodyStrong">Laporan Bulanan Notaris</AppText>
+            <AppText variant="caption" color={NotaryColors.textSecondary}>
+              Versi {versi} · {jumlahAkta} akta
+            </AppText>
+          </View>
+        </View>
+        <View style={dokumenStyles.actions}>
+          <View style={dokumenStyles.slot}>
+            <Button label="Pratinjau" variant="outline" icon="eye-outline" onPress={onPratinjau} />
+          </View>
+          <View style={dokumenStyles.slot}>
+            <Button label="Ekspor" icon="download-outline" onPress={onEkspor} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const dokumenStyles = StyleSheet.create({
+  wrap: { gap: 10 },
+  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  card: {
+    gap: 14,
+    padding: 14,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: NotaryColors.border,
+    backgroundColor: NotaryColors.card,
+    ...Shadow.card,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  thumb: {
+    width: 52,
+    height: 68,
+    gap: 5,
+    padding: 7,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: NotaryColors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  thumbLogo: { width: 12, height: 12, borderRadius: 3, backgroundColor: NotaryColors.primary },
+  thumbGaris: { height: 3, borderRadius: 2, backgroundColor: NotaryColors.border },
+  thumbPendek: { width: '60%' },
+  texts: { flex: 1, alignItems: 'flex-start', gap: 4 },
+  actions: { flexDirection: 'row', gap: 12 },
+  slot: { flex: 1 },
+});
+
 // ───────────────────────── Layar Laporan ─────────────────────────
 
 interface ReportsScreenProps {
   /** Buka halaman Repertorium (di luar tab, bottom nav tersembunyi). */
   onOpenRepertorium: () => void;
+  /** Buka halaman Pratinjau Laporan. */
+  onOpenPratinjau: () => void;
 }
 
 /** Halaman Laporan — ringkasan periode, validasi data, dan pintasan ke Repertorium. */
-export function ReportsScreen({ onOpenRepertorium }: ReportsScreenProps) {
+export function ReportsScreen({ onOpenRepertorium, onOpenPratinjau }: ReportsScreenProps) {
   useStatusBarStyle('dark');
   const { summary, aktaPeriode } = useLaporan();
   const [periodeOpen, setPeriodeOpen] = useState(false);
   const [validasiOpen, setValidasiOpen] = useState(false);
+    const [eksporOpen, setEksporOpen] = useState(false);
 
   const openValidasi = () => setValidasiOpen(true);
 
@@ -360,11 +449,13 @@ export function ReportsScreen({ onOpenRepertorium }: ReportsScreenProps) {
           <Button label="Selesaikan Validasi" icon="eye-outline" compact onPress={openValidasi} />
         </View>
 
+        <DokumenCard onPratinjau={onOpenPratinjau} onEkspor={() => setEksporOpen(true)} />
         <RepertoriumLink jumlah={aktaPeriode.length} onPress={onOpenRepertorium} />
       </ScrollView>
 
       <PeriodeSheet visible={periodeOpen} onClose={() => setPeriodeOpen(false)} />
       <ValidasiKategoriSheet visible={validasiOpen} onClose={() => setValidasiOpen(false)} />
+      <EksporSheet visible={eksporOpen} onClose={() => setEksporOpen(false)} />
     </View>
   );
 }
