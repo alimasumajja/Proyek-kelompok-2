@@ -13,6 +13,7 @@ import {
 import { ProfileStoreProvider } from '@/context/profile-store';
 import { ServiceStoreProvider } from '@/context/service-store';
 import { ToastProvider } from '@/context/toast';
+import { AuthProvider } from '@/context/AuthContext';
 
 // Tahan splash bawaan sampai font siap agar tidak ada kedipan font sistem.
 SplashScreen.preventAutoHideAsync();
@@ -39,25 +40,27 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
-      <ServiceStoreProvider>
-        <ProfileStoreProvider>
-          <ToastProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* Splash & Auth screens */}
-              <Stack.Screen name="screenawal" />
-              <Stack.Screen name="login" />
-              {/* Tab group — bottom navigation */}
-              <Stack.Screen name="(tabs)" />
-              {/* Halaman turunan (tanpa bottom navigation) */}
-              <Stack.Screen name="layanan/[id]" />
-              <Stack.Screen name="notifikasi" />
-            <Stack.Screen name="jenis-layanan" />
-              <Stack.Screen name="profile/staf" />
-            </Stack>
-          </ToastProvider>
-        </ProfileStoreProvider>
-      </ServiceStoreProvider>
-    </SafeAreaProvider>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <ServiceStoreProvider>
+          <ProfileStoreProvider>
+            <ToastProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                {/* Splash & Auth screens */}
+                <Stack.Screen name="screenawal" />
+                <Stack.Screen name="login" />
+                {/* Tab group — bottom navigation */}
+                <Stack.Screen name="(tabs)" />
+                {/* Halaman turunan (tanpa bottom navigation) */}
+                <Stack.Screen name="layanan/[id]" />
+                <Stack.Screen name="notifikasi" />
+                <Stack.Screen name="jenis-layanan" />
+                <Stack.Screen name="profile/staf" />
+              </Stack>
+            </ToastProvider>
+          </ProfileStoreProvider>
+        </ServiceStoreProvider>
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }

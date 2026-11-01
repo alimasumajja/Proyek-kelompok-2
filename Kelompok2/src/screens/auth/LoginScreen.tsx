@@ -7,12 +7,13 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import {userAccountsData } from '@/data/dummy';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
+  const { login } = useAuth();
   // 2. Fungsi Eksekusi (Terhubung dengan dummy.ts)
   const handleLogin = () => {
     const inputEmail = email.trim().toLowerCase();
@@ -31,6 +32,7 @@ export default function LoginScreen() {
       }
 
       // Login berhasil
+      login(matchedUser);
       Alert.alert('Login Berhasil', `Selamat datang, ${matchedUser.name}!\nMasuk sebagai: ${matchedUser.role}`);
       
       // Arahkan ke dasbor

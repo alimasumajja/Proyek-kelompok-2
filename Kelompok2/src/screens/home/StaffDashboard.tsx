@@ -11,7 +11,7 @@ import { getNearestDeadline, getPriorityServices, summarizeServices } from '@/ut
 import { Button } from '@/components/atoms';
 import { DeadlineCard, EmptyState, SectionHeader, ServiceCard } from '@/components/molecules';
 import { HistoryPanel, HomeHeader, SummaryGrid } from '@/components/organisms';
-
+import { useAuth } from '@/context/AuthContext';
 interface StaffDashboardProps {
   onNavigateToServices: (tab: ServiceTab) => void;
   onOpenService: (serviceId: string) => void;
@@ -39,7 +39,8 @@ export function StaffDashboard({
 }: StaffDashboardProps) {
   useStatusBarStyle('light');
   const { notes, activities } = useServiceStore();
-  const { account, services, unreadCount } = useSession();
+  const { services, unreadCount } = useSession();
+  const { user } = useAuth();
 
   const openService = (service: ServiceItem) => onOpenService(service.id);
 
@@ -61,9 +62,9 @@ export function StaffDashboard({
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <HomeHeader
           dateLabel={todayLabel}
-          greeting={`Selamat pagi, ${account.name.split(' ')[0]}`}
+          greeting={`Selamat pagi, ${user.name.split(' ')[0]}`}
           subtitle="Berikut tugas Anda hari ini."
-          userInitials={account.initials}
+          userInitials={user?.initials ??'ST'}
           unreadCount={unreadCount}
           onNotificationPress={onOpenNotifications}
           onAvatarPress={onOpenProfile}
