@@ -12,12 +12,17 @@ Perbaikan yang dilakukan diantaranya menambahkan form untuk CRUD jenis layanan, 
 ### Bukti Perbaikan ###
 1. Tambah Form Untuk CRUD jenis Layanan
 
-[Bukti disini]
+![alt text](20261102-0350-33.5323499.gif)
 
 2. Perbaikan Format Tanggal
 
-[Bukti disini]
+![alt text](<Screen_Recording_20261102_103445_Expo Go.gif>)
 
 3. gif untuk staff dan Flownya
 
-[Bukti disini]
+![alt text](<Screen_Recording_20261102_101855_Expo Go (1).gif>)
+![alt text](<WhatsApp Video 2026-11-02 at 10.31.42.gif>)
+
+4. preview dan export laporan
+
+![alt text](laporan-1.gif)
