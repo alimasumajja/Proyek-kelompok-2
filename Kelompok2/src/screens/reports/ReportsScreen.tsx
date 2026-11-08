@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { NotaryColors, Radius, Shadow } from '@/constants/notary-theme';
-import { useLaporan } from '@/context/laporan-store';
+import { muatSemua, useLaporan, useLaporanStore } from '@/context/laporan-store';
 import { useIsiDokumen } from '@/hooks/use-isi-dokumen';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import { STATUS_DOKUMEN_TONE, STATUS_VALIDASI_TONE, type ValidasiItem } from '@/types/laporan';
@@ -403,6 +403,7 @@ interface ReportsScreenProps {
 export function ReportsScreen({ onOpenRepertorium, onOpenPratinjau }: ReportsScreenProps) {
   useStatusBarStyle('dark');
   const { summary, aktaPeriode } = useLaporan();
+  const { memuat } = useLaporanStore();
   const [periodeOpen, setPeriodeOpen] = useState(false);
   const [validasiOpen, setValidasiOpen] = useState(false);
     const [eksporOpen, setEksporOpen] = useState(false);
@@ -415,7 +416,8 @@ export function ReportsScreen({ onOpenRepertorium, onOpenPratinjau }: ReportsScr
 
       <ScrollView
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={memuat} onRefresh={() => void muatSemua()} />}>
         <PeriodeCard
           periode={summary.periodeLabel}
           diperbarui={summary.diperbaruiLabel}
