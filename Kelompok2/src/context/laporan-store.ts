@@ -1,11 +1,23 @@
 import { useMemo, useSyncExternalStore } from 'react';
+import { Alert } from 'react-native';
+import {
+  ambilDokumen,
+  ambilKonfirmasi,
+  ambilSemuaAkta,
+  mintaRevisiDb,
+  setujuiLaporanDb,
+  simpanKonfirmasi,
+  tambahAktaDb,
+  ubahAktaDb,
+} from '@/lib/laporan-api';
+import { supabase } from '@/lib/supabase';
 import type {Akta, AktaInput, DokumenLaporan, LaporanSummary, NamaTemplate, ValidasiItem,} from '@/types/laporan';
 import { formatDateId, parseInputDate } from '@/utils/date';
 
 /**
  * Semua logika & data fitur Laporan/Repertorium dalam satu file:
  * konstanta, helper tanggal, data contoh, store (di memori), dan hook `useLaporan`.
- * Saat backend (Supabase) tersedia, cukup ganti isi bagian "Data contoh" dan "Store".
+ * Data dibaca dari dan disimpan ke Supabase (lihat `lib/laporan-api.ts`).
  */
 
 // ───────────────────────── Konstanta & helper ─────────────────────────
@@ -56,89 +68,49 @@ export function todayInput(): string {
   return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
 }
 
-// ───────────────────────── Data contoh (sementara, sebelum backend tersedia) ─────────────────────────
-
-/** Data contoh Repertorium (sementara, sebelum backend tersedia). */
-export const aktaData: Akta[] = [
-  {
-    id: 'AK-1',
-    nomorUrut: '001',
-    nomorAkta: '12/2026',
-    tanggal: '12-03-2026',
-    jenis: 'Pendirian PT',
-    pihak: 'PT Nusa Karya Sentosa',
-    sifat: 'Minuta',
-    status: 'Terbit',
-    catatan: 'Telah dicatat dan diperiksa.',
-  },
-  {
-    id: 'AK-2',
-    nomorUrut: '002',
-    nomorAkta: '13/2026',
-    tanggal: '17-03-2026',
-    jenis: 'Akta Jual Beli',
-    pihak: 'Sri Rahmawati & Andre Wijaya',
-    sifat: 'Minuta',
-    status: 'Terbit',
-    catatan: '',
-  },
-  {
-    id: 'AK-3',
-    nomorUrut: '003',
-    nomorAkta: '14/2026',
-    tanggal: '19-03-2026',
-    jenis: 'Perjanjian Kredit',
-    pihak: 'Hadi Kurniawan',
-    sifat: 'Minuta',
-    status: 'Draf',
-    catatan: '',
-  },
-  // Sengaja di luar periode Maret: contoh peringatan "data di luar periode".
-  {
-    id: 'AK-4',
-    nomorUrut: '004',
-    nomorAkta: '15/2026',
-    tanggal: '02-04-2026',
-    jenis: 'Akta Jual Beli',
-    pihak: 'CV Mitra Abadi',
-    sifat: 'Minuta',
-    status: 'Terbit',
-    catatan: '',
-  },
-];
-
 // ───────────────────────── Store ─────────────────────────
 
 /**
- * Penyimpanan state Laporan & Repertorium (sementara di memori).
- * Dipakai bersama layar Laporan dan Repertorium agar perubahan periode, konfirmasi
- * kategori, dan koreksi akta langsung terlihat di keduanya.
+ * State Laporan & Repertorium. Sumber data: Supabase. Store ini hanya menyimpan salinan
+ * di memori supaya layar Laporan dan Repertorium selalu sinkron.
  *
- * Sengaja memakai store ringan (tanpa Provider) supaya `app/_layout.tsx` milik tim tidak
- * perlu diubah. Saat backend (Supabase) tersedia, cukup ganti isi fungsi di file ini.
+ * Tanpa Provider (supaya `app/_layout.tsx` milik tim tidak perlu diubah). Data dimuat otomatis
+ * saat pengguna login dan dikosongkan saat logout (lihat `onAuthStateChange` di bawah).
  */
 interface LaporanState {
   /** 0-11 */
   bulan: number;
   tahun: number;
   akta: Akta[];
+  /** Kategori yang sudah dikonfirmasi kosong pada periode aktif. */
   kategoriKosong: string[];
   diperbarui: Date;
-    /** Status dokumen laporan per periode (kunci: lihat `kunciPeriode`). */
+  /** Status dokumen laporan per periode (kunci: lihat `kunciPeriode`). */
   dokumen: Record<string, DokumenLaporan>;
   /** Template format dokumen yang sedang dipakai. */
   templateId: NamaTemplate;
+  /** True sementara data sedang diambil dari server. */
+  memuat: boolean;
+  /** True setelah data pertama berhasil dimuat. */
+  dimuat: boolean;
 }
 
-let state: LaporanState = {
-  bulan: 2,
-  tahun: 2026,
-  akta: aktaData,
-  kategoriKosong: [],
-  diperbarui: new Date(),
-  dokumen: {},
-  templateId: 'Ringkas',
-};
+function stateAwal(): LaporanState {
+  const sekarang = new Date();
+  return {
+    bulan: sekarang.getMonth(),
+    tahun: sekarang.getFullYear(),
+    akta: [],
+    kategoriKosong: [],
+    diperbarui: new Date(),
+    dokumen: {},
+    templateId: 'Ringkas',
+    memuat: false,
+    dimuat: false,
+  };
+}
+
+let state: LaporanState = stateAwal();
 
 const listeners = new Set<() => void>();
 
@@ -159,28 +131,106 @@ export function useLaporanStore(): LaporanState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+/** Tampilkan kegagalan ke pengguna tanpa mengubah layar yang sudah ada. */
+function lapor(judul: string, error: unknown) {
+  const pesan = error instanceof Error ? error.message : 'Terjadi kesalahan tak terduga.';
+  console.warn(`[laporan] ${judul}: ${pesan}`);
+  Alert.alert(judul, pesan);
+}
+
+// ───────────────────────── Memuat data dari Supabase ─────────────────────────
+
+async function muatAkta() {
+  emit({ akta: await ambilSemuaAkta() });
+}
+
+async function muatDokumen() {
+  emit({ dokumen: await ambilDokumen() });
+}
+
+async function muatKonfirmasi() {
+  const { bulan, tahun } = state;
+  const kategori = await ambilKonfirmasi(bulan, tahun);
+  // Abaikan hasil lama bila pengguna sudah pindah periode.
+  if (bulan === state.bulan && tahun === state.tahun) emit({ kategoriKosong: kategori });
+}
+
+/** Muat ulang seluruh data. Dipanggil otomatis saat login; boleh dipanggil manual (tarik-segarkan). */
+export async function muatSemua() {
+  emit({ memuat: true });
+  try {
+    await Promise.all([muatAkta(), muatDokumen(), muatKonfirmasi()]);
+    emit({ memuat: false, dimuat: true });
+  } catch (error) {
+    emit({ memuat: false });
+    lapor('Gagal memuat data laporan', error);
+  }
+}
+
+// Mengikuti sesi login: muat saat masuk, kosongkan saat keluar.
+let penggunaTermuat: string | null = null;
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    penggunaTermuat = null;
+    state = stateAwal();
+    listeners.forEach((listener) => listener());
+    return;
+  }
+  const id = session?.user?.id;
+  if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && id && id !== penggunaTermuat) {
+    penggunaTermuat = id;
+    // Jangan memanggil Supabase langsung di dalam callback ini (bisa menggantung).
+    setTimeout(() => void muatSemua(), 0);
+  }
+});
+
+// ───────────────────────── Aksi: periode, konfirmasi, akta ─────────────────────────
+
 export function setPeriode(bulan: number, tahun: number) {
-  emit({ bulan, tahun });
+  emit({ bulan, tahun, kategoriKosong: [] });
+  muatKonfirmasi().catch((error) => lapor('Gagal memuat konfirmasi kategori', error));
 }
 
 export function confirmKategoriKosong(kategori: string[]) {
+  const { bulan, tahun } = state;
   emit({ kategoriKosong: [...new Set([...state.kategoriKosong, ...kategori])] });
+  simpanKonfirmasi(bulan, tahun, kategori).catch(async (error) => {
+    lapor('Konfirmasi gagal disimpan', error);
+    await muatKonfirmasi().catch(() => undefined);
+  });
 }
 
-let sequence = 0;
-
-export function addAkta(input: AktaInput) {
-  const created: Akta = { id: `AK-${Date.now()}-${sequence++}`, ...input };
-  emit({ akta: [...state.akta, created] });
+export async function addAkta(input: AktaInput): Promise<boolean> {
+  try {
+    await tambahAktaDb(input);
+    await muatAkta();
+    return true;
+  } catch (error) {
+    lapor('Akta gagal disimpan', error);
+    return false;
+  }
 }
 
-export function updateAkta(id: string, input: AktaInput) {
-  emit({ akta: state.akta.map((a) => (a.id === id ? { id, ...input } : a)) });
+export async function updateAkta(id: string, input: AktaInput): Promise<boolean> {
+  try {
+    await ubahAktaDb(id, input);
+    await muatAkta();
+    return true;
+  } catch (error) {
+    lapor('Koreksi akta gagal disimpan', error);
+    return false;
+  }
 }
 
-/** Nomor urut berikutnya (001, 002, ...) untuk form tambah akta. */
+/**
+ * Nomor urut berikutnya (001, 002, ...) untuk form tambah akta: urutan tertinggi pada tahun
+ * periode aktif + 1. Server tetap menjaga keunikan (tahun, nomor urut).
+ */
 export function nextNomorUrut(): string {
-  return String(state.akta.length + 1).padStart(3, '0');
+  const terbesar = state.akta
+    .filter((a) => parseInputDate(a.tanggal)?.getFullYear() === state.tahun)
+    .reduce((maks, a) => Math.max(maks, parseInt(a.nomorUrut, 10) || 0), 0);
+  return String(terbesar + 1).padStart(3, '0');
 }
 
 // ───────────────────────── Dokumen laporan: persetujuan & versi ─────────────────────────
@@ -201,25 +251,31 @@ export function labelVersi(dokumen: DokumenLaporan): string {
   return dokumen.status === 'Final' ? `${dokumen.versiFinal}.0` : `${dokumen.versiFinal}.1`;
 }
 
-function patchDokumenAktif(patch: (lama: DokumenLaporan) => DokumenLaporan) {
-  const kunci = kunciPeriode(state.bulan, state.tahun);
-  const lama = state.dokumen[kunci] ?? DOKUMEN_BARU;
-  emit({ dokumen: { ...state.dokumen, [kunci]: patch(lama) } });
+/**
+ * Menyetujui laporan periode aktif (hanya Notaris, diperiksa server). Server yang menaikkan
+ * versi dan membuat snapshot dari data akta, jadi parameter `_akta` tidak lagi dipakai.
+ */
+export async function setujuiLaporan(_akta: Akta[], periodeLabel: string): Promise<boolean> {
+  try {
+    await setujuiLaporanDb(state.bulan, state.tahun, periodeLabel);
+    await muatDokumen();
+    return true;
+  } catch (error) {
+    lapor('Laporan gagal disetujui', error);
+    return false;
+  }
 }
 
-/** Menyetujui laporan periode aktif: status Final, versi naik, data dikunci sebagai snapshot. */
-export function setujuiLaporan(akta: Akta[], periodeLabel: string) {
-  patchDokumenAktif((lama) => ({
-    status: 'Final',
-    versiFinal: lama.versiFinal + 1,
-    catatanRevisi: '',
-    snapshot: { periodeLabel, disetujuiPada: new Date().toISOString(), akta: akta.map((a) => ({ ...a })) },
-  }));
-}
-
-/** Meminta revisi. Bila laporan sudah Final, versi final lama tetap tersimpan sebagai snapshot. */
-export function mintaRevisi(catatan: string) {
-  patchDokumenAktif((lama) => ({ ...lama, status: 'Revisi Diminta', catatanRevisi: catatan }));
+/** Meminta revisi (hanya Notaris). Snapshot versi final lama tetap tersimpan di server. */
+export async function mintaRevisi(catatan: string): Promise<boolean> {
+  try {
+    await mintaRevisiDb(state.bulan, state.tahun, catatan);
+    await muatDokumen();
+    return true;
+  } catch (error) {
+    lapor('Permintaan revisi gagal', error);
+    return false;
+  }
 }
 
 export function setTemplate(templateId: NamaTemplate) {
