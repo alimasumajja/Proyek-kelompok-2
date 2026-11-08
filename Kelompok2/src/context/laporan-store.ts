@@ -114,8 +114,12 @@ let state: LaporanState = stateAwal();
 
 const listeners = new Set<() => void>();
 
+/** Perubahan pada bagian ini dianggap "data diperbarui" (untuk label Terakhir diperbarui). */
+const BAGIAN_DATA: (keyof LaporanState)[] = ['akta', 'dokumen', 'kategoriKosong'];
+
 function emit(patch: Partial<LaporanState>) {
-  state = { ...state, ...patch, diperbarui: new Date() };
+  const dataBerubah = BAGIAN_DATA.some((kunci) => kunci in patch);
+  state = { ...state, ...patch, ...(dataBerubah ? { diperbarui: new Date() } : {}) };
   listeners.forEach((listener) => listener());
 }
 
@@ -308,16 +312,20 @@ export function useLaporan(): UseLaporan {
 
   return useMemo(() => {
     const aktaPeriode = akta.filter((a) => isInPeriode(a.tanggal, bulan, tahun));
+    const adaAkta = aktaPeriode.length > 0;
     const aktaLengkap = aktaPeriode.every((a) => a.nomorAkta && a.pihak && a.jenis);
 
     const validasi: ValidasiItem[] = [
       {
         id: 'daftar-akta',
         judul: 'Daftar Akta',
-        deskripsi: aktaLengkap
-          ? 'Semua field sesuai ketentuan'
-          : 'Ada akta dengan data belum lengkap',
-        status: aktaLengkap ? 'Lengkap' : 'Tinjau',
+        // `every` pada daftar kosong selalu true, jadi periode tanpa akta tidak boleh dianggap lengkap.
+        deskripsi: !adaAkta
+          ? 'Belum ada akta pada periode ini'
+          : aktaLengkap
+            ? 'Semua field sesuai ketentuan'
+            : 'Ada akta dengan data belum lengkap',
+        status: adaAkta && aktaLengkap ? 'Lengkap' : 'Tinjau',
       },
       ...KATEGORI_VALIDASI.map((kategori): ValidasiItem => {
         const adaData = aktaPeriode.some((a) => a.jenis === kategori);
