@@ -1,27 +1,24 @@
 import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { router } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 export default function IndexScreen() {
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    const checkSession = async () => {
-      // Data statis untuk UTS: asumsikan belum login
-      const hasSession = false; 
-
-      if (!hasSession) {
-        // Jika belum login, arahkan ke Splash Screen (screenawal)
-        router.replace('/screenawal'); 
-      } else {
-        // Jika sudah login, arahkan ke dasbor utama
-         router.replace('/(tabs)');
-      }
-    };
-
-    checkSession();
-  }, []);
+    if (loading) return;
+    router.replace(user ? '/(tabs)' : '/screenawal');
+  }, [loading, user]);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+    <View
+      style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+      }}>
       <ActivityIndicator size="large" color="#17352D" />
     </View>
   );

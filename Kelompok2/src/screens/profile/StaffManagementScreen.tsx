@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotaryColors, Radius } from '@/constants/notary-theme';
 import { useProfileStore } from '@/context/profile-store';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/toast';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import type { StaffMember } from '@/types/profile';
@@ -22,13 +23,13 @@ export function StaffManagementScreen({ onBack }: StaffManagementScreenProps) {
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { account, staff, isUsernameTaken, addStaff, updateStaff, toggleStaffStatus } =
-    useProfileStore();
+  const { user } = useAuth();
+  const { staff, isUsernameTaken, addStaff, updateStaff, toggleStaffStatus } = useProfileStore();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
 
-  if (account.role !== 'Notaris') {
+  if (user?.role !== 'Notaris') {
     return (
       <View style={styles.screen}>
         <AppHeader title="Manajemen Staf" onBack={onBack} />

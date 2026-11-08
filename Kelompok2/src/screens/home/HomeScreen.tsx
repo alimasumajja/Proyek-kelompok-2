@@ -40,6 +40,7 @@ export function HomeScreen({
   useStatusBarStyle('light');
   const { notes } = useServiceStore();
   const { account, isNotaris, services, unreadCount } = useSession();
+  if (!account) return null;
 
   // Staf memiliki dashboard tersendiri (tugas saya), bukan ringkasan kantor.
   if (!isNotaris) {

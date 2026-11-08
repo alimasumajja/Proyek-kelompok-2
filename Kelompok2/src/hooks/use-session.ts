@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useProfileStore } from '@/context/profile-store';
+import { useAuth } from '@/context/AuthContext';
 import { useServiceStore } from '@/context/service-store';
 import {
   isNotaris as checkNotaris,
@@ -10,28 +10,34 @@ import {
 
 /**
  * Sesi pengguna aktif + data yang boleh dilihatnya.
- * Sumber kebenaran peran/nama adalah akun aktif di ProfileStore; layar cukup memakai hook ini.
+ * Identitas dan peran berasal dari profil Supabase melalui AuthContext.
  */
 export function useSession() {
-  const { account } = useProfileStore();
+  const { user } = useAuth();
   const { services, notifications } = useServiceStore();
 
   const actor = useMemo<Actor>(
-    () => ({ role: account.role, name: account.name }),
-    [account.role, account.name]
+    () => ({ role: user?.role ?? 'Staf', name: user?.name ?? '' }),
+    [user?.role, user?.name]
   );
 
-  const myServices = useMemo(() => visibleServices(actor, services), [actor, services]);
-  const myNotifications = useMemo(
-    () => visibleNotifications(actor, notifications, services),
-    [actor, notifications, services]
+  const myServices = useMemo(
+    () => (user ? visibleServices(actor, services) : []),
+    [actor, services, user]
   );
-  const unreadCount = useMemo(() => myNotifications.filter((n) => !n.read).length, [myNotifications]);
+  const myNotifications = useMemo(
+    () => (user ? visibleNotifications(actor, notifications, services) : []),
+    [actor, notifications, services, user]
+  );
+  const unreadCount = useMemo(
+    () => myNotifications.filter((notification) => !notification.read).length,
+    [myNotifications]
+  );
 
   return {
-    account,
+    account: user,
     actor,
-    isNotaris: checkNotaris(actor),
+    isNotaris: user ? checkNotaris(actor) : false,
     services: myServices,
     notifications: myNotifications,
     unreadCount,
