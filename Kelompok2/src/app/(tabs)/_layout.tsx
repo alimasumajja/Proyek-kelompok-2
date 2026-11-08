@@ -1,12 +1,27 @@
-import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { router, Tabs } from 'expo-router';
 import { BottomNavBar } from '@/components/organisms';
+import { useAuth } from '@/context/AuthContext';
 
 /**
- * Layout tab (Bottom Navigation) — PRD §10: Beranda, Layanan, Tambah, Laporan, Profil.
- * Tampilan bar memakai komponen kustom <BottomNavBar /> lewat prop `tabBar`,
- * sedangkan perilaku navigasinya tetap dikelola Expo Router.
+ * Tab utama hanya dapat diakses setelah sesi Supabase dan profil pengguna tervalidasi.
  */
 export default function TabLayout() {
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) router.replace('/login');
+  }, [loading, user]);
+
+  if (loading || !user) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#17352D" />
+      </View>
+    );
+  }
+
   return (
     <Tabs tabBar={(props) => <BottomNavBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={{ title: 'Beranda' }} />

@@ -1,66 +1,65 @@
-import React, { useState } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, 
-  StyleSheet, KeyboardAvoidingView, Platform, StatusBar, Alert 
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
-import {userAccountsData } from '@/data/dummy';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
-  // 2. Fungsi Eksekusi (Terhubung dengan dummy.ts)
-  const handleLogin = () => {
-    const inputEmail = email.trim().toLowerCase();
+  const [submitting, setSubmitting] = useState(false);
+  const { login, user, loading } = useAuth();
 
-    // Mencari kecocokan data di array userAccountsData
-    const matchedUser = userAccountsData.find(
-      (user) => user.email.toLowerCase() === inputEmail && user.password === password
-    );
+  useEffect(() => {
+    if (!loading && user) router.replace('/(tabs)');
+  }, [loading, user]);
 
-    // Jika data ditemukan
-    if (matchedUser) {
-      // Pengecekan ekstra: Tolak akses jika akun berstatus Nonaktif (contoh: akun dewi)
-      if (matchedUser.status === 'Nonaktif') {
-        Alert.alert('Akses Ditolak', 'Akun Anda saat ini dinonaktifkan. Silakan hubungi Admin/Notaris.');
-        return;
-      }
+  const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      Alert.alert('Data belum lengkap', 'Masukkan email dan kata sandi.');
+      return;
+    }
 
-      // Login berhasil
-      login(matchedUser);
-      Alert.alert('Login Berhasil', `Selamat datang, ${matchedUser.name}!\nMasuk sebagai: ${matchedUser.role}`);
-      
-      // Arahkan ke dasbor
+    setSubmitting(true);
+    try {
+      const user = await login(email, password);
+      Alert.alert('Login Berhasil', `Selamat datang, ${user.name}!`);
       router.replace('/(tabs)');
-    } 
-    // Jika data tidak cocok atau kosong
-    else {
-      Alert.alert(
-        'Login Gagal', 
-        'Email atau kata sandi salah.\n\nContoh akses:\nEmail: nadia.larasati@kantor.id\nSandi: notaris123'
-      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Email atau kata sandi tidak sesuai.';
+      Alert.alert('Login Gagal', message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="light-content" />
-      
-      {/* --- Bagian Header Hijau --- */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <View style={styles.logoBox}>
             <Text style={styles.logoLetter}>N</Text>
           </View>
-          <Text style={styles.logoText}>Notaris<Text style={styles.logoTextBold}>AI</Text></Text>
+          <Text style={styles.logoText}>
+            Notaris<Text style={styles.logoTextBold}>AI</Text>
+          </Text>
         </View>
 
         <View style={styles.badge}>
@@ -71,73 +70,134 @@ export default function LoginScreen() {
         <Text style={styles.welcomeSubtitle}>Masuk untuk memantau layanan kantor Anda.</Text>
       </View>
 
-      {/* --- Bagian Formulir --- */}
       <View style={styles.formContainer}>
-        
-        {/* Kolom Email */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Email</Text>
           <View style={styles.inputWrapper}>
             <Feather name="mail" size={20} color="#7a7a7a" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="nadia.larasati@kantor.id"
+              placeholder="Masukkan email"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
+              editable={!submitting}
+              returnKeyType="next"
             />
           </View>
         </View>
 
-        {/* Kolom Kata Sandi */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Kata sandi</Text>
           <View style={styles.inputWrapper}>
             <Feather name="lock" size={20} color="#7a7a7a" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="••••••••"
+              placeholder="Masukkan kata sandi"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              editable={!submitting}
+              onSubmitEditing={handleLogin}
+              returnKeyType="done"
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#7a7a7a" style={styles.inputIconRight} />
+            <TouchableOpacity
+              onPress={() => setShowPassword((current) => !current)}
+              disabled={submitting}
+              accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}>
+              <Feather
+                name={showPassword ? 'eye' : 'eye-off'}
+                size={20}
+                color="#7a7a7a"
+                style={styles.inputIconRight}
+              />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* --- Tombol Masuk --- */}
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Masuk</Text>
+        <TouchableOpacity
+          style={[styles.loginButton, submitting && styles.loginButtonDisabled]}
+          onPress={handleLogin}
+          disabled={submitting}>
+          {submitting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.loginButtonText}>Masuk</Text>
+          )}
         </TouchableOpacity>
-
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-// ... (Styles tetap sama persis seperti sebelumnya)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  header: { backgroundColor: '#17352D', paddingTop: 80, paddingBottom: 40, paddingHorizontal: 24, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  header: {
+    backgroundColor: '#17352D',
+    paddingTop: 80,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
   logoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 48 },
-  logoBox: { borderWidth: 1, borderColor: '#D4AF37', borderRadius: 8, width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  logoLetter: { color: NotaryColors.gold, fontSize: 18 ,fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }) },
+  logoBox: {
+    borderWidth: 1,
+    borderColor: '#D4AF37',
+    borderRadius: 8,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  logoLetter: {
+    color: NotaryColors.gold,
+    fontSize: 18,
+    fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }),
+  },
   logoText: { color: '#ffffff', fontSize: 20 },
   logoTextBold: { fontWeight: 'bold', color: '#D4AF37' },
-  badge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, alignSelf: 'flex-start', marginBottom: 16 },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+  },
   badgeText: { color: '#D4AF37', fontSize: 12, marginLeft: 6, fontWeight: '500' },
   welcomeTitle: { color: '#ffffff', fontSize: 32, fontWeight: '600', marginBottom: 8 },
   welcomeSubtitle: { color: '#cccccc', fontSize: 14, lineHeight: 20 },
   formContainer: { padding: 24, paddingTop: 32 },
   inputGroup: { marginBottom: 20 },
   inputLabel: { color: '#1d1d1f', fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 12, paddingHorizontal: 16, backgroundColor: '#ffffff', height: 52 },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#ffffff',
+    height: 52,
+  },
   inputIcon: { marginRight: 12 },
   inputIconRight: { marginLeft: 12 },
   input: { flex: 1, fontSize: 16, color: '#1d1d1f' },
-  loginButton: { backgroundColor: '#17352D', borderRadius: 9999, height: 52, justifyContent: 'center', alignItems: 'center', marginTop: 12 },
+  loginButton: {
+    backgroundColor: '#17352D',
+    borderRadius: 9999,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  loginButtonDisabled: { opacity: 0.7 },
   loginButtonText: { color: '#ffffff', fontSize: 17, fontWeight: '600' },
 });

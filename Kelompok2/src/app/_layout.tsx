@@ -40,9 +40,9 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <AuthProvider>
-      <SafeAreaProvider>
-        <ServiceStoreProvider>
+    <SafeAreaProvider>
+      <ServiceStoreProvider>
+        <AuthProvider>
           <ProfileStoreProvider>
             <ToastProvider>
               <Stack screenOptions={{ headerShown: false }}>
@@ -59,8 +59,8 @@ export default function RootLayout() {
               </Stack>
             </ToastProvider>
           </ProfileStoreProvider>
-        </ServiceStoreProvider>
-      </SafeAreaProvider>
-    </AuthProvider>
+        </AuthProvider>
+      </ServiceStoreProvider>
+    </SafeAreaProvider>
   );
 }

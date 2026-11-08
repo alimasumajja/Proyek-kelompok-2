@@ -43,3 +43,8 @@ example
 /android
 
 /reference/
+
+# Environment variables
+.env
+.env.*
+!.env.example

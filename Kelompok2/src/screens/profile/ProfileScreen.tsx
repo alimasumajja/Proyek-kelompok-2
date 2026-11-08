@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotaryColors, Radius } from '@/constants/notary-theme';
+import { useAuth } from '@/context/AuthContext';
 import { useProfileStore } from '@/context/profile-store';
 import { useServiceStore } from '@/context/service-store';
 import { useToast } from '@/context/toast';
@@ -9,76 +10,63 @@ import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import { AppText, Button } from '@/components/atoms';
 import { ActionListItem, ConfirmDialog, StatTile } from '@/components/molecules';
 import {
-  AccountDemoCard,
-  AccountInfoSheet,
   AppHeader,
   NotificationSettingsSheet,
   ProfileSummaryCard,
 } from '@/components/organisms';
 
 interface ProfileScreenProps {
-  /** Dipanggil setelah pengguna mengonfirmasi keluar (navigasi diatur oleh route). */
+  /** Dipanggil setelah pengguna mengonfirmasi keluar; navigasi diatur oleh route. */
   onLogout: () => void;
   /** Buka halaman Manajemen Staf (hanya Notaris). */
   onOpenStaffManagement: () => void;
 }
 
 /**
- * Halaman Profil — PRD §4.1 dan §12 (Hak Akses). Tampilan mengikuti akun yang masuk:
- *  - Notaris (pemilik): ringkasan kantor + Manajemen Staf.
- *  - Staf: ringkasan tugas milik sendiri, tanpa Manajemen Staf.
- * Akun & staf dari profile-store; data layanan dari service-store.
+ * Identitas dan peran mengikuti profil Supabase. Data staf serta preferensi notifikasi
+ * masih menggunakan penyimpanan lokal sementara dan belum menjadi data backend.
  */
 export function ProfileScreen({ onLogout, onOpenStaffManagement }: ProfileScreenProps) {
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const { services } = useServiceStore();
-  const {
-    account,
-    accounts,
-    staff,
-    notificationPrefs,
-    switchAccount,
-    signOut,
-    updateAccount,
-    saveNotificationPrefs,
-  } = useProfileStore();
+  const { staff, notificationPrefs, saveNotificationPrefs } = useProfileStore();
 
-  const [accountOpen, setAccountOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  const isOwner = account.role === 'Notaris';
+  const isOwner = user?.role === 'Notaris';
 
   const stats = useMemo(() => {
-    const scope = isOwner ? services : services.filter((s) => s.assignedStaff.name === account.name);
+    const scope = isOwner
+      ? services
+      : services.filter((service) => service.assignedStaff.name === user?.name);
     return {
-      total: scope.length,
-      ongoing: scope.filter((s) => s.status !== 'Selesai').length,
-      late: scope.filter((s) => s.status === 'Terlambat').length,
-      done: scope.filter((s) => s.status === 'Selesai').length,
+      ongoing: scope.filter((service) => service.status !== 'Selesai').length,
+      late: scope.filter((service) => service.status === 'Terlambat').length,
+      done: scope.filter((service) => service.status === 'Selesai').length,
     };
-  }, [services, isOwner, account.name]);
+  }, [services, isOwner, user?.name]);
 
-  const activeStaff = staff.filter((s) => s.status === 'Aktif').length;
-  const demoAccounts = accounts.filter((a) => a.status === 'Aktif');
-
+  const activeStaff = staff.filter((member) => member.status === 'Aktif');
   const summaryTiles: { label: string; value: number; tone?: 'danger' | 'success' }[] = [
     { label: isOwner ? 'Berjalan' : 'Ditangani', value: stats.ongoing },
     { label: 'Terlambat', value: stats.late, tone: stats.late > 0 ? 'danger' : undefined },
     { label: 'Selesai', value: stats.done, tone: 'success' },
-    ...(isOwner ? [{ label: 'Staf aktif', value: activeStaff }] : []),
+    ...(isOwner ? [{ label: 'Staf aktif', value: activeStaff.length }] : []),
   ];
+
+  if (!user) return null;
 
   return (
     <View style={styles.screen}>
       <AppHeader title="Profil" />
-
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
         showsVerticalScrollIndicator={false}>
-        <ProfileSummaryCard account={account} />
+        <ProfileSummaryCard account={user} />
 
         <View style={styles.section}>
           <AppText variant="eyebrow" color={NotaryColors.textSecondary}>
@@ -98,12 +86,6 @@ export function ProfileScreen({ onLogout, onOpenStaffManagement }: ProfileScreen
           <AppText variant="eyebrow" color={NotaryColors.textSecondary}>
             PENGATURAN
           </AppText>
-          <ActionListItem
-            icon="person-outline"
-            title="Informasi Akun"
-            description="Nama dan email akun"
-            onPress={() => setAccountOpen(true)}
-          />
           {isOwner ? (
             <ActionListItem
               icon="people-outline"
@@ -120,20 +102,6 @@ export function ProfileScreen({ onLogout, onOpenStaffManagement }: ProfileScreen
           />
         </View>
 
-        <View style={styles.section}>
-          <AppText variant="eyebrow" color={NotaryColors.textSecondary}>
-            MODE DEMO · MASUK SEBAGAI
-          </AppText>
-          <AccountDemoCard
-            accounts={demoAccounts}
-            currentId={account.id}
-            onSelect={(id) => {
-              switchAccount(id);
-              showToast('Akun demo diganti');
-            }}
-          />
-        </View>
-
         <Button
           label="Keluar"
           icon="log-out-outline"
@@ -142,15 +110,6 @@ export function ProfileScreen({ onLogout, onOpenStaffManagement }: ProfileScreen
         />
       </ScrollView>
 
-      <AccountInfoSheet
-        visible={accountOpen}
-        account={account}
-        onClose={() => setAccountOpen(false)}
-        onSave={(next) => {
-          updateAccount(next);
-          showToast('Informasi akun diperbarui');
-        }}
-      />
       <NotificationSettingsSheet
         visible={notifOpen}
         prefs={notificationPrefs}
@@ -168,7 +127,6 @@ export function ProfileScreen({ onLogout, onOpenStaffManagement }: ProfileScreen
         onCancel={() => setLogoutOpen(false)}
         onConfirm={() => {
           setLogoutOpen(false);
-          signOut();
           onLogout();
         }}
       />

@@ -62,9 +62,9 @@ export function StaffDashboard({
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <HomeHeader
           dateLabel={todayLabel}
-          greeting={`Selamat pagi, ${user.name.split(' ')[0]}`}
+          greeting={`Selamat pagi, ${user?.name?.split(' ')[0] ?? 'Staf'}`}
           subtitle="Berikut tugas Anda hari ini."
-          userInitials={user?.initials ??'ST'}
+          userInitials={user?.initials ?? 'ST'}
           unreadCount={unreadCount}
           onNotificationPress={onOpenNotifications}
           onAvatarPress={onOpenProfile}

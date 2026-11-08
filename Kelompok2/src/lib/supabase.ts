@@ -1,15 +1,46 @@
+
 import 'react-native-url-polyfill/auto';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const key = process.env.EXPO_PUBLIC_SUPABASE_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabasePublishableKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-export const supabase = createClient(url, key, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
+if (!supabaseUrl || !supabasePublishableKey) {
+  throw new Error('Konfigurasi Supabase belum lengkap.');
+}
+
+// Web menggunakan localStorage di browser.
+// Ketika SSR berjalan di Node.js, akses storage dilewati.
+const webStorage = {
+  getItem: async (key: string): Promise<string | null> => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(key);
   },
-});
+
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(key, value);
+  },
+
+  removeItem: async (key: string): Promise<void> => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(key);
+  },
+};
+
+export const supabase = createClient(
+  supabaseUrl,
+  supabasePublishableKey,
+  {
+    auth: {
+      storage: Platform.OS === 'web' ? webStorage : AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  }
+);
