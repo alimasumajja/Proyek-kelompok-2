@@ -1,49 +1,50 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import type { ActionResult } from '@/types/service';
-import { SERVICE_TYPE_MAX_LENGTH } from '@/utils/service-types';
-import { Button, Input } from '../atoms';
-import { BottomSheet, FormField } from '../molecules';
+import React, { useState } from "react";
+import { StyleSheet, View } from "react-native";
+import type { ActionResult } from "@/types/service";
+import { SERVICE_TYPE_MAX_LENGTH } from "@/utils/service-types";
+import { Button, Input } from "../atoms";
+import { BottomSheet, FormField } from "../molecules";
 
 interface ServiceTypeFormSheetProps {
   visible: boolean;
-  mode: 'add' | 'edit';
+  mode: "add" | "edit";
   initialName?: string;
   onClose: () => void;
   /** Mengembalikan hasil validasi dari store; bila ok, pemanggil menutup sheet. */
-  onSubmit: (name: string) => ActionResult;
+  onSubmit: (name: string) => Promise<ActionResult>;
 }
 
 /** Formulir tambah / ubah nama jenis layanan. */
-export function ServiceTypeFormSheet({
-  visible,
-  mode,
-  initialName = '',
-  onClose,
-  onSubmit,
-}: ServiceTypeFormSheetProps) {
+export function ServiceTypeFormSheet({ visible, mode, initialName = "", onClose, onSubmit }: ServiceTypeFormSheetProps) {
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      title={mode === 'add' ? 'Tambah Jenis Layanan' : 'Ubah Jenis Layanan'}>
-      {/* Form hanya ter-mount saat sheet terbuka, sehingga isian selalu mulai dari nilai awal. */}
-      <Form mode={mode} initialName={initialName} onSubmit={onSubmit} />
+    <BottomSheet visible={visible} onClose={onClose} title={mode === "add" ? "Tambah Jenis Layanan" : "Ubah Jenis Layanan"}>
+      {visible ? <Form key={`${mode}-${initialName}`} mode={mode} initialName={initialName} onSubmit={onSubmit} /> : null}
     </BottomSheet>
   );
 }
 
-function Form({
-  mode,
-  initialName,
-  onSubmit,
-}: Pick<ServiceTypeFormSheetProps, 'mode' | 'onSubmit'> & { initialName: string }) {
+function Form({ mode, initialName, onSubmit }: Pick<ServiceTypeFormSheetProps, "mode" | "onSubmit"> & { initialName: string }) {
   const [name, setName] = useState(initialName);
   const [error, setError] = useState<string | undefined>();
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = () => {
-    const result = onSubmit(name);
-    if (!result.ok) setError(result.error);
+  const submit = async () => {
+    if (submitting) return;
+
+    setError(undefined);
+    setSubmitting(true);
+
+    try {
+      const result = await onSubmit(name);
+
+      if (!result.ok) {
+        setError(result.error);
+      }
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba kembali.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -65,7 +66,8 @@ function Form({
           accessibilityLabel="Nama jenis layanan"
         />
       </FormField>
-      <Button label={mode === 'add' ? 'Simpan Jenis Layanan' : 'Simpan Perubahan'} onPress={submit} />
+
+      <Button label={submitting ? "Menyimpan..." : mode === "add" ? "Simpan Jenis Layanan" : "Simpan Perubahan"} onPress={submit} disabled={submitting} />
     </View>
   );
 }

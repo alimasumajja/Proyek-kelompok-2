@@ -128,6 +128,9 @@ export interface ServiceType {
   id: string;
   name: string;
   active: boolean;
+  description?: string | null;
+  allowsRegistrationSkip?: boolean;
+  usageCount?: number; // jumlah layanan yang memakai jenis ini
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
