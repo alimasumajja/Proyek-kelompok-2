@@ -39,11 +39,11 @@ export function ReportPreviewScreen({ onBack }: ReportPreviewScreenProps) {
 
   const final = dokumen.status === 'Final';
 
-  const setujui = () => {
+  const setujui = async () => {
     if (!bolehMenyetujui) return;
-    setujuiLaporan(aktaPeriode, summary.periodeLabel);
+    const berhasil = await setujuiLaporan(aktaPeriode, summary.periodeLabel);
     setSetujuiOpen(false);
-    showToast('Laporan disetujui dan dikunci');
+    if (berhasil) showToast('Laporan disetujui dan dikunci');
   };
 
   return (
