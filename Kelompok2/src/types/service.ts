@@ -1,8 +1,13 @@
 /** Status layanan. Label teks selalu ditampilkan, tidak hanya warna (PRD §13.3). */
-export type ServiceStatus = 'Aktif' | 'Terlambat' | 'Selesai' | 'Perlu Perhatian';
+export type ServiceStatus = 'Aktif' | 'Ditunda' | 'Dibatalkan' | 'Terlambat' | 'Selesai' | 'Perlu Perhatian';
 
 /** Tab/filter pada daftar layanan. */
-export type ServiceTab = 'Semua' | ServiceStatus;
+export type ServiceTab =
+  | 'Semua'
+  | 'Aktif'
+  | 'Terlambat'
+  | 'Selesai'
+  | 'Perlu Perhatian';
 
 export type ServicePriority = 'Tinggi' | 'Sedang' | 'Rendah';
 
@@ -10,6 +15,8 @@ export type ServicePriority = 'Tinggi' | 'Sedang' | 'Rendah';
 export type ServiceSort = 'default' | 'priority' | 'due';
 
 export interface StaffRef {
+  /** UUID profil Supabase; kosong hanya untuk data dummy lama. */
+  id?: string;
   name: string;
   initials: string;
 }
@@ -22,12 +29,15 @@ export interface ServiceItem {
   currentStage: string;
   progressPercent: number; // 0–100, dihitung dari tahap (PRD §6.5), bukan input manual
   assignedStaff: StaffRef;
+  /** Seluruh UUID anggota (penanggung jawab dan pendukung) dari service_members. */
+  assignedStaffIds?: string[];
   dueDate: string; // mis. "18 Mar 2026"
   status: ServiceStatus;
   priority?: ServicePriority;
   receivedDate: string; // mis. "18 Mar 2026"
   clientContact?: string;
   description?: string;
+  statusReason?: string;
 }
 
 export interface OperationalSummary {

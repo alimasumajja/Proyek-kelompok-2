@@ -11,7 +11,15 @@ import { monthShortUpper, parseDisplayDate } from '@/utils/date';
 
 export const ALL_TABS: ServiceTab[] = ['Semua', 'Aktif', 'Terlambat', 'Selesai'];
 
-const VALID_TABS: ServiceTab[] = ['Semua', 'Aktif', 'Terlambat', 'Selesai', 'Perlu Perhatian'];
+const VALID_TABS = [
+  'Semua',
+  'Aktif',
+  'Ditunda',
+  'Dibatalkan',
+  'Terlambat',
+  'Selesai',
+  'Perlu Perhatian',
+] as const;
 
 /** Memvalidasi nilai tab dari parameter rute (string bebas) menjadi ServiceTab. */
 export function parseServiceTab(value: string | string[] | undefined): ServiceTab {
