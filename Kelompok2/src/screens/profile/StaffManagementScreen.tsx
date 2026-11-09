@@ -97,18 +97,26 @@ export function StaffManagementScreen({ onBack }: StaffManagementScreenProps) {
         staff={editing}
         isUsernameTaken={isUsernameTaken}
         onClose={() => setFormOpen(false)}
-        onSave={({ name, email, username, password }) => {
-          if (editing) {
-            updateStaff(editing.id, { name, email });
-            showToast('Data staf diperbarui');
-          } else {
-            addStaff({ name, email, username, password });
-            showToast('Staf baru ditambahkan');
+        onSave={async ({ name, email, username, password }) => {
+          try {
+            if (editing) {
+              await updateStaff(editing.id, { name });
+              showToast('Data staf diperbarui');
+            } else {
+              await addStaff({ name, email, username, password });
+              showToast('Staf baru ditambahkan');
+            }
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : 'Gagal menyimpan');
           }
         }}
-        onToggleStatus={(id) => {
-          toggleStaffStatus(id);
-          showToast('Status staf diperbarui');
+        onToggleStatus={async (id) => {
+          try {
+            await toggleStaffStatus(id);
+            showToast('Status staf diperbarui');
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : 'Gagal mengubah status');
+          }
         }}
       />
     </View>
