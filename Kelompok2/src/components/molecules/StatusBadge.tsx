@@ -4,6 +4,8 @@ import { Badge, type BadgeTone } from '../atoms';
 
 const STATUS_TONE: Record<ServiceStatus, BadgeTone> = {
   Aktif: 'success',
+  Ditunda: 'warning',
+  Dibatalkan: 'neutral',
   'Perlu Perhatian': 'warning',
   Terlambat: 'danger',
   Selesai: 'neutral',

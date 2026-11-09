@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NotaryColors, Radius } from '@/constants/notary-theme';
 import { useSession } from '@/hooks/use-session';
@@ -43,7 +43,7 @@ export function LayananScreen({
 }: LayananScreenProps) {
   useStatusBarStyle('dark');
   // Staf hanya mendapat layanan yang ditugaskan kepadanya (lihat utils/permissions).
-  const { services, isNotaris } = useSession();
+  const { services, isNotaris, servicesLoading, servicesError, refreshServices } = useSession();
   const staffOptions = useMemo(() => getStaffNames(services), [services]);
 
   const {
@@ -161,12 +161,26 @@ export function LayananScreen({
         }
       />
 
+      {servicesError ? (
+        <View style={styles.loadError}>
+          <InfoNote tone="warning" title="Data layanan belum dapat dimuat" text={servicesError} />
+          <Pressable onPress={() => void refreshServices()} accessibilityRole="button" style={styles.retry}>
+            <AppText variant="label" color={NotaryColors.primary}>Coba lagi</AppText>
+          </Pressable>
+        </View>
+      ) : null}
       <FlatList
         data={results}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ServiceCard item={item} onPress={openService} />}
         ListHeaderComponent={header}
         ListEmptyComponent={
+          servicesLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator color={NotaryColors.primary} />
+              <AppText variant="caption" color={NotaryColors.textSecondary}>Memuat layanan...</AppText>
+            </View>
+          ) : (
           <EmptyState
             title="Tidak ada layanan ditemukan"
             description={
@@ -177,6 +191,7 @@ export function LayananScreen({
             actionLabel={anyFilterActive ? 'Hapus filter' : undefined}
             onActionPress={clearFilters}
           />
+          )
         }
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
@@ -199,6 +214,9 @@ export function LayananScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: NotaryColors.background },
+  loadError: { paddingHorizontal: 16, paddingTop: 12 },
+  retry: { alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 8 },
+  loading: { alignItems: 'center', gap: 10, paddingVertical: 32 },
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
   header: { gap: 12, marginBottom: 4 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
