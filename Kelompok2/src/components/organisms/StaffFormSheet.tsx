@@ -26,7 +26,7 @@ interface StaffFormSheetProps {
 
 const EMPTY: StaffFormInput = { name: '', email: '', username: '', password: '' };
 const USERNAME_PATTERN = /^[a-z0-9._]{3,}$/;
-const MIN_PASSWORD = 6;
+const MIN_PASSWORD = 8;
 
 /** Sheet "Tambah Staf" / "Ubah Staf" — hanya dapat dibuka oleh Notaris (PRD §12). */
 export function StaffFormSheet({

@@ -21,6 +21,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { login, user, loading } = useAuth();
 
   useEffect(() => {
@@ -28,8 +29,11 @@ export default function LoginScreen() {
   }, [loading, user]);
 
   const handleLogin = async () => {
+    setErrorMessage(null);
     if (!email.trim() || !password) {
-      Alert.alert('Data belum lengkap', 'Masukkan email dan kata sandi.');
+      const msg = 'Masukkan email/username dan kata sandi.';
+      setErrorMessage(msg);
+      Alert.alert('Data belum lengkap', msg);
       return;
     }
 
@@ -41,6 +45,7 @@ export default function LoginScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Email atau kata sandi tidak sesuai.';
+      setErrorMessage(message);
       Alert.alert('Login Gagal', message);
     } finally {
       setSubmitting(false);
@@ -71,16 +76,25 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.formContainer}>
+        {errorMessage ? (
+          <View style={styles.errorBanner}>
+            <Feather name="alert-circle" size={18} color="#D32F2F" style={{ marginTop: 2 }} />
+            <Text style={styles.errorBannerText}>{errorMessage}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email</Text>
+          <Text style={styles.inputLabel}>Email atau Username</Text>
           <View style={styles.inputWrapper}>
-            <Feather name="mail" size={20} color="#7a7a7a" style={styles.inputIcon} />
+            <Feather name="user" size={20} color="#7a7a7a" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Masukkan email"
+              placeholder="Masukkan email atau username"
               value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              onChangeText={(t) => {
+                setEmail(t);
+                if (errorMessage) setErrorMessage(null);
+              }}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!submitting}
@@ -175,6 +189,24 @@ const styles = StyleSheet.create({
   welcomeTitle: { color: '#ffffff', fontSize: 32, fontWeight: '600', marginBottom: 8 },
   welcomeSubtitle: { color: '#cccccc', fontSize: 14, lineHeight: 20 },
   formContainer: { padding: 24, paddingTop: 32 },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFEBEE',
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+    marginBottom: 20,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: '#D32F2F',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
   inputGroup: { marginBottom: 20 },
   inputLabel: { color: '#1d1d1f', fontSize: 14, fontWeight: '600', marginBottom: 8 },
   inputWrapper: {

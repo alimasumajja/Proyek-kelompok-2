@@ -114,9 +114,13 @@ export function ProfileScreen({ onLogout, onOpenStaffManagement }: ProfileScreen
         visible={notifOpen}
         prefs={notificationPrefs}
         onClose={() => setNotifOpen(false)}
-        onSave={(next) => {
-          saveNotificationPrefs(next);
-          showToast('Pengaturan notifikasi disimpan');
+        onSave={async (next) => {
+          try {
+            await saveNotificationPrefs(next);
+            showToast('Pengaturan notifikasi disimpan');
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : 'Gagal menyimpan');
+          }
         }}
       />
       <ConfirmDialog

@@ -6,18 +6,21 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { Alert, AppState } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { UserAccount } from '@/types/profile';
 import type { UserRole } from '@/types/service';
 import { getInitials } from '@/utils/service';
 import { useServiceStore } from '@/context/service-store';
+import { verifyLocalAccount } from '@/lib/account-registry';
 
 interface AuthContextValue {
   user: UserAccount | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<UserAccount>;
+  login: (emailOrUsername: string, password: string) => Promise<UserAccount>;
   logout: () => Promise<void>;
+  checkActiveStatus: () => Promise<boolean>;
 }
 
 interface ProfileRow {
@@ -51,15 +54,17 @@ async function fetchUserProfile(userId: string, email: string): Promise<UserAcco
     .from('profiles')
     .select('id, full_name, role, is_active')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
-    throw new Error('Profil akun tidak ditemukan. Hubungi Notaris/pengelola aplikasi.');
+    throw new Error('Profil akun tidak ditemukan atau akses ditolak. Hubungi Notaris.');
   }
 
   const profile = data as ProfileRow;
   if (!profile.is_active) {
-    throw new Error('Akun Anda sedang dinonaktifkan. Hubungi Notaris/pengelola aplikasi.');
+    throw new Error(
+      'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
+    );
   }
 
   return mapProfile(profile, email);
@@ -69,6 +74,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setRole } = useServiceStore();
   const [user, setUser] = useState<UserAccount | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const logout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* abaikan galat koneksi */
+    }
+    setUser(null);
+  }, []);
 
   const restoreSession = useCallback(async (session: Session | null) => {
     if (!session?.user) {
@@ -83,13 +97,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile = await fetchUserProfile(session.user.id, email);
       setRole(profile.role);
       setUser(profile);
-    } catch {
-      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Gagal memulihkan sesi pengguna:', e);
+      await supabase.auth.signOut().catch(() => {});
       setUser(null);
     } finally {
       setLoading(false);
     }
   }, [setRole]);
+
+  // Verifikasi status akun aktif saat aplikasi kembali ke foreground
+  const checkActiveStatus = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+
+    // Untuk akun lokal mock
+    if (user.id.startsWith('acc-') || user.id.startsWith('mock-') || user.id.startsWith('local-')) {
+      const localResult = await verifyLocalAccount(user.email || user.username, user.password || '');
+      if (localResult && localResult.isInactive) {
+        await logout();
+        Alert.alert(
+          'Akses Ditolak',
+          'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
+        );
+        return false;
+      }
+      return true;
+    }
+
+    // Untuk akun Supabase
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error || !data || data.is_active === false) {
+        await logout();
+        Alert.alert(
+          'Akses Ditolak',
+          'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
+        );
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  }, [user, logout]);
 
   useEffect(() => {
     let mounted = true;
@@ -119,39 +174,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [restoreSession]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
+  // Berlangganan perubahan status profil (Realtime) dan status AppState
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // 1. Cek realtime jika akun Supabase
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    if (!user.id.startsWith('acc-') && !user.id.startsWith('mock-')) {
+      channel = supabase
+        .channel(`user-profile-status-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            const updated = payload.new as { is_active?: boolean };
+            if (updated && updated.is_active === false) {
+              void logout();
+              Alert.alert(
+                'Akses Ditolak',
+                'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
+              );
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    // 2. Cek saat user kembali ke app (AppState)
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void checkActiveStatus();
+      }
     });
 
-    if (error) throw error;
-    if (!data.user?.email) throw new Error('Data pengguna dari Supabase tidak lengkap.');
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+      appStateSub.remove();
+    };
+  }, [user?.id, logout, checkActiveStatus]);
 
-    try {
-      const profile = await fetchUserProfile(data.user.id, data.user.email);
-      setRole(profile.role);
-      setUser(profile);
-      return profile;
-    } catch (profileError) {
-      await supabase.auth.signOut();
-      throw profileError;
-    }
-  }, [setRole]);
+  const login = useCallback(
+    async (emailOrUsername: string, passwordInput: string) => {
+      const trimmed = emailOrUsername.trim();
 
-  const logout = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-  }, []);
+      // 1. Cek terlebih dahulu di registry akun lokal / dummy
+      const localResult = await verifyLocalAccount(trimmed, passwordInput);
+      if (localResult) {
+        if (!localResult.ok) {
+          throw new Error(
+            localResult.error || 'Akun Anda tidak aktif atau kata sandi tidak sesuai.'
+          );
+        }
+        if (localResult.account) {
+          setRole(localResult.account.role);
+          setUser(localResult.account);
+          return localResult.account;
+        }
+      }
+
+      // 2. Jika bukan akun lokal, coba autentikasi dengan Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmed.toLowerCase(),
+        password: passwordInput,
+      });
+
+      if (error) {
+        const errorMsg = error.message.toLowerCase();
+        // Deteksi jika akun di-ban / dinonaktifkan di Supabase Auth
+        if (
+          errorMsg.includes('banned') ||
+          errorMsg.includes('disabled') ||
+          errorMsg.includes('inactive')
+        ) {
+          throw new Error(
+            'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
+          );
+        }
+        throw new Error('Email atau kata sandi tidak sesuai.');
+      }
+
+      if (!data.user?.email) throw new Error('Data pengguna dari Supabase tidak lengkap.');
+
+      try {
+        const profile = await fetchUserProfile(data.user.id, data.user.email);
+        setRole(profile.role);
+        setUser(profile);
+        return profile;
+      } catch (profileError) {
+        await supabase.auth.signOut().catch(() => {});
+        setUser(null);
+        throw profileError;
+      }
+    },
+    [setRole]
+  );
 
   useEffect(() => {
     if (user) setRole(user.role);
   }, [user, setRole]);
 
   const value = useMemo(
-    () => ({ user, loading, login, logout }),
-    [user, loading, login, logout]
+    () => ({ user, loading, login, logout, checkActiveStatus }),
+    [user, loading, login, logout, checkActiveStatus]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
