@@ -257,11 +257,13 @@ function AktaForm({ akta, onClose }: { akta: Akta | null; onClose: () => void })
         }
   );
   const [errors, setErrors] = useState<Errors>({});
+  const [menyimpan, setMenyimpan] = useState(false);
 
   const set = <K extends keyof AktaInput>(key: K, value: AktaInput[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const simpan = () => {
+  const simpan = async () => {
+    if (menyimpan) return;
     const next: Errors = {};
     if (!form.nomorAkta.trim()) next.nomorAkta = 'Nomor akta wajib diisi';
     if (!form.pihak.trim()) next.pihak = 'Nama pihak terkait wajib diisi';
@@ -275,14 +277,16 @@ function AktaForm({ akta, onClose }: { akta: Akta | null; onClose: () => void })
       pihak: form.pihak.trim(),
       catatan: form.catatan.trim(),
     };
-    if (akta) {
-      updateAkta(akta.id, data);
-      showToast(`Koreksi akta ${data.nomorAkta} disimpan`);
-    } else {
-      addAkta(data);
-      showToast(`Akta ${data.nomorAkta} ditambahkan`);
+    setMenyimpan(true);
+    try {
+      // Form tetap terbuka bila gagal; pesan kesalahan ditampilkan oleh store.
+      const berhasil = akta ? await updateAkta(akta.id, data) : await addAkta(data);
+      if (!berhasil) return;
+      showToast(akta ? `Koreksi akta ${data.nomorAkta} disimpan` : `Akta ${data.nomorAkta} ditambahkan`);
+      onClose();
+    } finally {
+      setMenyimpan(false);
     }
-    onClose();
   };
 
   return (
@@ -367,7 +371,7 @@ function AktaForm({ akta, onClose }: { akta: Akta | null; onClose: () => void })
         <InfoNote text="Koreksi tidak menghapus catatan sebelumnya dan akan ditandai dalam riwayat." />
       ) : null}
 
-      <Button label={akta ? 'Simpan Koreksi' : 'Simpan Akta'} onPress={simpan} />
+      <Button label={akta ? 'Simpan Koreksi' : 'Simpan Akta'} disabled={menyimpan} onPress={simpan} />
     </View>
   );
 }

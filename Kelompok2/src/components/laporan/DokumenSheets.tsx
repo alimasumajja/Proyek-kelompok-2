@@ -33,15 +33,22 @@ function RevisiForm({ onClose }: { onClose: () => void }) {
   const { showToast } = useToast();
   const [catatan, setCatatan] = useState('');
   const [error, setError] = useState<string | undefined>();
+  const [mengirim, setMengirim] = useState(false);
 
-  const kirim = () => {
+  const kirim = async () => {
+    if (mengirim) return;
     if (!catatan.trim()) {
       setError('Catatan revisi wajib diisi');
       return;
     }
-    mintaRevisi(catatan.trim());
-    showToast('Permintaan revisi dikirim');
-    onClose();
+    setMengirim(true);
+    try {
+      if (!(await mintaRevisi(catatan.trim()))) return;
+      showToast('Permintaan revisi dikirim');
+      onClose();
+    } finally {
+      setMengirim(false);
+    }
   };
 
   return (
@@ -59,7 +66,7 @@ function RevisiForm({ onClose }: { onClose: () => void }) {
           accessibilityLabel="Catatan revisi"
         />
       </FormField>
-      <Button label="Kirim Permintaan" onPress={kirim} />
+      <Button label="Kirim Permintaan" disabled={mengirim} onPress={kirim} />
     </View>
   );
 }

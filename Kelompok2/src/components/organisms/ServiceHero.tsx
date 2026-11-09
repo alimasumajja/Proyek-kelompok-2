@@ -8,6 +8,8 @@ import { AppText, Avatar, Badge, type BadgeTone } from '../atoms';
 
 const HERO_TONE: Record<ServiceStatus, BadgeTone> = {
   Aktif: 'success',
+  Ditunda: 'gold',
+  Dibatalkan: 'neutral',
   'Perlu Perhatian': 'gold',
   Terlambat: 'danger',
   Selesai: 'neutral',

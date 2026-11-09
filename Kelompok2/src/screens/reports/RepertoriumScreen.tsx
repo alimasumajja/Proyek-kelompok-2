@@ -6,6 +6,8 @@ import { FigmaTokens, NotaryColors, Radius, Shadow } from '@/constants/notary-th
 import {
   BULAN,
   formatTanggalAkta,
+  muatSemua,
+  useDokumen,
   useLaporan,
   useLaporanStore,
 } from '@/context/laporan-store';
@@ -147,8 +149,11 @@ interface RepertoriumScreenProps {
 export function RepertoriumScreen({ onBack }: RepertoriumScreenProps) {
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
-  const { bulan, tahun } = useLaporanStore();
+  const { bulan, tahun, memuat, dimuat } = useLaporanStore();
   const { aktaPeriode } = useLaporan();
+  const { dokumen } = useDokumen();
+  // Periode Final terkunci: server menolak perubahan, jadi tombol juga disembunyikan.
+  const terkunci = dokumen.status === 'Final';
 
   const [cari, setCari] = useState('');
   const [periodeOpen, setPeriodeOpen] = useState(false);
@@ -164,7 +169,9 @@ export function RepertoriumScreen({ onBack }: RepertoriumScreenProps) {
       )
     : aktaPeriode;
 
-  const bukaForm = (akta: Akta | null) => setKoreksi({ open: true, akta });
+  const bukaForm = (akta: Akta | null) => {
+    if (!terkunci) setKoreksi({ open: true, akta });
+  };
 
   const header = (
     <View style={styles.header}>
@@ -185,6 +192,14 @@ export function RepertoriumScreen({ onBack }: RepertoriumScreenProps) {
           </AppText>
         </Pressable>
       </View>
+      {terkunci ? (
+        <InfoNote
+          tone="neutral"
+          icon="lock-closed-outline"
+          title="Periode sudah Final"
+          text="Akta pada periode ini terkunci. Notaris dapat meminta revisi di Pratinjau Laporan untuk membukanya."
+        />
+      ) : null}
     </View>
   );
 
@@ -203,7 +218,7 @@ export function RepertoriumScreen({ onBack }: RepertoriumScreenProps) {
       <AppHeader
         title="Repertorium"
         onBack={onBack}
-        action={{ icon: 'add', label: 'Tambah akta', onPress: () => bukaForm(null) }}
+        action={terkunci ? undefined : { icon: 'add', label: 'Tambah akta', onPress: () => bukaForm(null) }}
       />
 
       <FlatList
@@ -214,17 +229,25 @@ export function RepertoriumScreen({ onBack }: RepertoriumScreenProps) {
         ListHeaderComponent={header}
         ListFooterComponent={footer}
         ListEmptyComponent={
-          <EmptyState
-            title="Tidak ada akta"
-            description={
-              query
-                ? `Tidak ada hasil untuk kata kunci "${cari.trim()}".`
-                : 'Belum ada akta pada periode ini. Ketuk + untuk menambah akta.'
-            }
-            actionLabel={query ? 'Hapus Pencarian' : undefined}
-            onActionPress={() => setCari('')}
-          />
+          memuat && !dimuat ? (
+            <EmptyState title="Memuat data…" description="Mengambil data akta dari server." />
+          ) : (
+            <EmptyState
+              title="Tidak ada akta"
+              description={
+                query
+                  ? `Tidak ada hasil untuk kata kunci "${cari.trim()}".`
+                  : terkunci
+                    ? 'Tidak ada akta pada periode ini.'
+                    : 'Belum ada akta pada periode ini. Ketuk + untuk menambah akta.'
+              }
+              actionLabel={query ? 'Hapus Pencarian' : undefined}
+              onActionPress={() => setCari('')}
+            />
+          )
         }
+        refreshing={memuat}
+        onRefresh={() => void muatSemua()}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

@@ -8,6 +8,7 @@ import type { NotificationItem, ServiceItem, UserRole } from '@/types/service';
  * backend/database (mis. Supabase RLS) dan diuji.
  */
 export interface Actor {
+  id?: string;
   role: UserRole;
   name: string;
 }
@@ -19,7 +20,9 @@ export const isNotaris = (actor: Actor): boolean => actor.role === 'Notaris';
  * Notaris melihat seluruh layanan (PRD §4.1, §6.7).
  */
 export function canViewService(actor: Actor, service: ServiceItem): boolean {
-  return isNotaris(actor) || service.assignedStaff.name === actor.name;
+  if (isNotaris(actor)) return true;
+  if (actor.id) return service.assignedStaffIds?.includes(actor.id) ?? service.assignedStaff.id === actor.id;
+  return service.assignedStaff.name === actor.name;
 }
 
 export function visibleServices(actor: Actor, services: ServiceItem[]): ServiceItem[] {
