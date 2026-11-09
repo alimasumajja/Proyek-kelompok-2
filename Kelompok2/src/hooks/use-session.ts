@@ -14,11 +14,11 @@ import {
  */
 export function useSession() {
   const { user } = useAuth();
-  const { services, notifications } = useServiceStore();
+  const { services, notifications, servicesLoading, servicesError, refreshServices } = useServiceStore();
 
   const actor = useMemo<Actor>(
-    () => ({ role: user?.role ?? 'Staf', name: user?.name ?? '' }),
-    [user?.role, user?.name]
+    () => ({ id: user?.id, role: user?.role ?? 'Staf', name: user?.name ?? '' }),
+    [user?.id, user?.role, user?.name]
   );
 
   const myServices = useMemo(
@@ -41,5 +41,8 @@ export function useSession() {
     services: myServices,
     notifications: myNotifications,
     unreadCount,
+    servicesLoading,
+    servicesError,
+    refreshServices,
   };
 }

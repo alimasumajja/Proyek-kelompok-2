@@ -29,5 +29,7 @@ export const STATUS_DASHBOARD_ORDER: Record<ServiceStatus, number> = {
   Terlambat: 0,
   'Perlu Perhatian': 1,
   Aktif: 2,
-  Selesai: 3,
+  Ditunda: 3,
+  Dibatalkan: 4,
+  Selesai: 5,
 };
