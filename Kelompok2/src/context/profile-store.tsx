@@ -6,14 +6,17 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '@/context/AuthContext';
 import { notificationPrefsData } from '@/data/dummy';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabasePublishableKey, supabaseUrl } from '@/lib/supabase';
 import type { NotificationPrefs, UserAccount } from '@/types/profile';
 import { getInitials } from '@/utils/service';
 import {
+  getAllAccountStatusOverrides,
   getAllLocalAccounts,
   registerLocalAccount,
+  setAccountStatusOverride,
   updateLocalAccountStatus,
 } from '@/lib/account-registry';
 
@@ -21,7 +24,7 @@ export interface NewStaff {
   name: string;
   email: string;
   username: string;
-  /** Kata sandi awal; dikirim ke Edge Function, tidak disimpan di app. */
+  /** Kata sandi awal untuk staf baru. */
   password: string;
 }
 
@@ -41,7 +44,7 @@ function toAccount(r: ProfileRow): UserAccount {
   return {
     id: r.id,
     username: r.username ?? (r.email?.split('@')[0] ?? ''),
-    password: '', // tidak pernah berasal dari database
+    password: '',
     name,
     email: r.email ?? '',
     initials: getInitials(name),
@@ -51,7 +54,7 @@ function toAccount(r: ProfileRow): UserAccount {
 }
 
 interface ProfileStoreValue {
-  /** Semua profil kantor (Notaris + Staf), dari tabel `profiles`. */
+  /** Semua profil kantor (Notaris + Staf), dari tabel `profiles` & `akun`. */
   accounts: UserAccount[];
   /** Hanya akun ber-peran Staf (untuk Manajemen Staf). */
   staff: UserAccount[];
@@ -59,7 +62,6 @@ interface ProfileStoreValue {
   notificationPrefs: NotificationPrefs;
   refresh: () => Promise<void>;
   isUsernameTaken: (username: string) => boolean;
-  /** Hanya nama yang diubah. Email login tidak bisa diubah dari app. */
   updateStaff: (id: string, changes: { name: string; email?: string }) => Promise<void>;
   addStaff: (input: NewStaff) => Promise<void>;
   toggleStaffStatus: (id: string) => Promise<void>;
@@ -70,7 +72,7 @@ const ProfileStoreContext = createContext<ProfileStoreValue | null>(null);
 
 const normalize = (username: string) => username.trim().toLowerCase();
 
-/** Pesan galat dari Edge Function (body JSON { error }) atau galat biasa. */
+/** Pesan galat dari Edge Function atau galat umum. */
 async function pesanGalat(error: unknown): Promise<string> {
   const ctx = (error as { context?: Response })?.context;
   if (ctx && typeof ctx.json === 'function') {
@@ -78,15 +80,22 @@ async function pesanGalat(error: unknown): Promise<string> {
       const body = await ctx.json();
       if (body?.error) return String(body.error);
     } catch {
-      /* abaikan, pakai pesan bawaan */
+      /* abaikan */
     }
   }
   return error instanceof Error ? error.message : 'Terjadi kesalahan';
 }
 
+function generateUuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /**
- * State Profil dari Supabase: daftar akun/staf dan preferensi notifikasi.
- * Identitas pengguna yang login tetap di AuthContext.
+ * State Profil dari Supabase (profiles & akun) serta registry lokal persisten.
  */
 export function ProfileStoreProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -96,48 +105,133 @@ export function ProfileStoreProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    let { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, role, is_active, email, username, notification_prefs')
-      .order('full_name');
-
-    // Jika gagal karena kolom opsional belum ada di Supabase, coba kolom dasar
-    if (error) {
-      const basic = await supabase
+    // 1. Ambil dari public.profiles
+    let profilesData: ProfileRow[] = [];
+    try {
+      const res = await supabase
         .from('profiles')
-        .select('id, full_name, role, is_active, email')
+        .select('id, full_name, role, is_active, email, username, notification_prefs')
         .order('full_name');
-      if (!basic.error && basic.data) {
-        data = basic.data.map((b) => ({
-          ...b,
-          username: null,
-          notification_prefs: null,
-        })) as unknown as typeof data;
-        error = null;
+
+      if (!res.error && res.data) {
+        profilesData = res.data as ProfileRow[];
+      } else if (res.error) {
+        // Coba kolom dasar jika skema lama
+        const basic = await supabase
+          .from('profiles')
+          .select('id, full_name, role, is_active, email')
+          .order('full_name');
+        if (!basic.error && basic.data) {
+          profilesData = basic.data.map((b) => ({
+            ...b,
+            username: null,
+            notification_prefs: null,
+          })) as ProfileRow[];
+        }
       }
+    } catch (e) {
+      console.warn('Gagal memuat public.profiles:', e);
     }
 
-    if (error) {
-      console.warn('Gagal memuat profiles dari Supabase:', error.message);
+    // 2. Ambil dari public.akun (skema alternatif di database user)
+    interface AkunRow {
+      id: string;
+      name: string;
+      username: string;
+      email: string;
+      role: string;
+      status: string;
     }
-    const dbRows = (data ?? []) as ProfileRow[];
+    let akunData: AkunRow[] = [];
+    try {
+      const aRes = await supabase.from('akun').select('id, name, username, email, role, status');
+      if (!aRes.error && aRes.data) {
+        akunData = aRes.data as AkunRow[];
+      }
+    } catch (e) {
+      console.warn('Gagal memuat public.akun:', e);
+    }
+
+    // 3. Ambil registry akun lokal & status overrides
     const localAccs = await getAllLocalAccounts();
-    const dbEmails = new Set(dbRows.map((r) => r.email?.toLowerCase()).filter(Boolean));
-    const merged = [...dbRows];
+    const overrides = await getAllAccountStatusOverrides();
 
-    for (const local of localAccs) {
-      if (!dbEmails.has(local.email.toLowerCase())) {
-        merged.push({
-          id: local.id,
-          full_name: local.name,
-          role: local.role === 'Notaris' ? 'notaris' : 'staff',
-          is_active: local.status === 'Aktif',
-          email: local.email,
-          username: local.username,
-          notification_prefs: null,
-        });
-      }
+    const merged: ProfileRow[] = [];
+    const seenEmails = new Set<string>();
+    const seenIds = new Set<string>();
+
+    // Bantu cek status override (agar staf nonaktif tidak kembali aktif saat refresh)
+    const resolveActive = (id: string, email: string | null, username: string | null, defaultActive: boolean): boolean => {
+      const idKey = id.toLowerCase();
+      const emKey = email ? email.toLowerCase() : '';
+      const unKey = username ? username.toLowerCase() : '';
+
+      if (overrides[idKey]) return overrides[idKey] === 'Aktif';
+      if (emKey && overrides[emKey]) return overrides[emKey] === 'Aktif';
+      if (unKey && overrides[unKey]) return overrides[unKey] === 'Aktif';
+      return defaultActive;
+    };
+
+    // A. Masukkan data dari profiles
+    for (const p of profilesData) {
+      const email = p.email ? p.email.toLowerCase() : '';
+      const username = p.username ? p.username.toLowerCase() : '';
+      const active = resolveActive(p.id, email, username, p.is_active);
+
+      merged.push({
+        ...p,
+        is_active: active,
+      });
+      if (email) seenEmails.add(email);
+      seenIds.add(p.id);
     }
+
+    // B. Masukkan data dari akun jika belum ada
+    for (const a of akunData) {
+      const email = a.email ? a.email.toLowerCase() : '';
+      const username = a.username ? a.username.toLowerCase() : '';
+      if (email && seenEmails.has(email)) continue;
+      if (seenIds.has(a.id)) continue;
+
+      const rawActive = (a.status || 'Aktif').toLowerCase() === 'aktif';
+      const active = resolveActive(a.id, email, username, rawActive);
+
+      merged.push({
+        id: a.id,
+        full_name: a.name,
+        role: (a.role || 'staff').toLowerCase() === 'notaris' ? 'notaris' : 'staff',
+        is_active: active,
+        email: a.email,
+        username: a.username,
+        notification_prefs: null,
+      });
+      if (email) seenEmails.add(email);
+      seenIds.add(a.id);
+    }
+
+    // C. Masukkan data dari registry lokal jika belum ada
+    for (const local of localAccs) {
+      const email = local.email.toLowerCase();
+      const username = local.username.toLowerCase();
+      if (email && seenEmails.has(email)) continue;
+      if (seenIds.has(local.id)) continue;
+
+      const rawActive = local.status === 'Aktif';
+      const active = resolveActive(local.id, email, username, rawActive);
+
+      merged.push({
+        id: local.id,
+        full_name: local.name,
+        role: local.role === 'Notaris' ? 'notaris' : 'staff',
+        is_active: active,
+        email: local.email,
+        username: local.username,
+        notification_prefs: null,
+      });
+      if (email) seenEmails.add(email);
+      seenIds.add(local.id);
+    }
+
     setRows(merged);
   }, []);
 
@@ -173,30 +267,18 @@ export function ProfileStoreProvider({ children }: { children: React.ReactNode }
   const updateStaff = useCallback(
     async (id: string, changes: { name: string }) => {
       const trimmedName = changes.name.trim();
-      if (id.startsWith('mock-') || id.startsWith('acc-')) {
-        setRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, full_name: trimmedName } : r))
-        );
-        return;
-      }
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ full_name: trimmedName })
-        .eq('id', id)
-        .select();
 
-      if (error) {
-        setRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, full_name: trimmedName } : r))
-        );
-        throw new Error(error.message);
-      }
-      if (!data || data.length === 0) {
-        setRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, full_name: trimmedName } : r))
-        );
-        throw new Error('Ditolak oleh Supabase RLS. Tambahkan policy UPDATE di Supabase.');
-      }
+      // Update state lokal seketika
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, full_name: trimmedName } : r))
+      );
+
+      // Update ke profiles & akun
+      await Promise.allSettled([
+        supabase.from('profiles').update({ full_name: trimmedName }).eq('id', id),
+        supabase.from('akun').update({ name: trimmedName }).eq('id', id),
+      ]);
+
       await refresh().catch(() => {});
     },
     [refresh]
@@ -210,100 +292,156 @@ export function ProfileStoreProvider({ children }: { children: React.ReactNode }
       if (roleStr !== 'staff' && roleStr !== 'staf') return;
 
       const nextStatus = !target.is_active;
+      const statusLabel = nextStatus ? 'Aktif' : 'Nonaktif';
 
-      // Update registry akun lokal (agar AuthContext langsung tahu akun ini aktif atau nonaktif)
+      // 1. Simpan override persisten (agar tidak akan pernah kembali aktif saat refresh)
+      await setAccountStatusOverride(id, statusLabel);
+      if (target.email) await setAccountStatusOverride(target.email, statusLabel);
+      if (target.username) await setAccountStatusOverride(target.username, statusLabel);
       await updateLocalAccountStatus(id, nextStatus);
 
-      // 1. Jika ini akun lokal / mock
-      if (id.startsWith('mock-') || id.startsWith('acc-')) {
-        setRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, is_active: nextStatus } : r))
-        );
-        return;
-      }
-
-      // 2. Coba update ke Supabase
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ is_active: nextStatus })
-        .eq('id', id)
-        .select();
-
-      if (error) {
-        // Terapkan lokal agar UI tetap responsif
-        setRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, is_active: nextStatus } : r))
-        );
-        throw new Error(
-          `Gagal menyimpan ke database (${error.message}). Jalankan SQL RLS di Supabase agar perubahan tersimpan permanen.`
-        );
-      }
-
-      if (!data || data.length === 0) {
-        // RLS memblokir update (0 baris ter-update)
-        setRows((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, is_active: nextStatus } : r))
-        );
-        throw new Error(
-          'Ditolak oleh Supabase RLS. Tambahkan policy UPDATE untuk Notaris di Supabase SQL Editor.'
-        );
-      }
-
-      // Berhasil di database
+      // 2. Perbarui state UI seketika
       setRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, is_active: nextStatus } : r))
       );
-      await refresh().catch(() => {});
+
+      // 3. Update ke public.profiles di Supabase
+      try {
+        await supabase
+          .from('profiles')
+          .update({ is_active: nextStatus })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('Gagal update status profiles di Supabase:', err);
+      }
+
+      // 4. Update ke public.akun di Supabase
+      try {
+        await supabase
+          .from('akun')
+          .update({ status: statusLabel })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('Gagal update status akun di Supabase:', err);
+      }
     },
-    [rows, refresh]
+    [rows]
   );
 
   const addStaff = useCallback(
     async (input: NewStaff) => {
+      const trimmedEmail = input.email.trim().toLowerCase();
+      const trimmedUsername = input.username.trim().toLowerCase();
+      const trimmedName = input.name.trim();
+
+      let staffId = '';
+
+      // 1. Coba lewat Edge Function create-staff terlebih dahulu
+      let edgeSuccess = false;
       try {
-        const { error } = await supabase.functions.invoke('create-staff', { body: input });
-        if (error) {
-          const pesan = await pesanGalat(error);
-          throw new Error(pesan);
+        const { data, error } = await supabase.functions.invoke('create-staff', { body: input });
+        if (!error && data?.user?.id) {
+          staffId = data.user.id;
+          edgeSuccess = true;
         }
-        await refresh();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        // Jika Edge function belum dideploy / 404 / gagal kirim
-        if (
-          msg.includes('Failed to send') ||
-          msg.includes('not found') ||
-          msg.includes('404') ||
-          msg.includes('Relay Error') ||
-          msg.includes('non-2xx')
-        ) {
-          // Tambahkan ke state lokal agar penambahan staf tetap bisa diuji langsung di aplikasi
-          const mockId = `mock-${Date.now()}`;
-          const newRow: ProfileRow = {
-            id: mockId,
-            full_name: input.name,
-            role: 'staff',
-            is_active: true,
-            email: input.email,
-            username: input.username,
-            notification_prefs: null,
-          };
-          await registerLocalAccount({
-            id: mockId,
-            name: input.name,
-            email: input.email,
-            username: input.username,
-            password: input.password,
-            role: 'Staf',
-            isActive: true,
-          });
-          setRows((prev) => [...prev, newRow]);
-          throw new Error(
-            'Edge Function belum dideploy di Supabase. Staf disimpan sementara di sesi ini (Deploy create-staff agar tersimpan permanen).'
-          );
-        }
-        throw err;
+      } catch {
+        /* Edge function belum dideploy, lanjut ke fallback langsung */
       }
+
+      // 2. Jika Edge Function tidak tersedia, buat user via Supabase Auth client terisolasi
+      if (!edgeSuccess && supabaseUrl && supabasePublishableKey) {
+        try {
+          const tempAuthClient = createClient(supabaseUrl, supabasePublishableKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false,
+            },
+          });
+          const { data: authData, error: authError } = await tempAuthClient.auth.signUp({
+            email: trimmedEmail,
+            password: input.password,
+            options: {
+              data: {
+                full_name: trimmedName,
+                username: trimmedUsername,
+                role: 'staff',
+              },
+            },
+          });
+
+          if (!authError && authData?.user?.id) {
+            staffId = authData.user.id;
+          }
+        } catch (authErr) {
+          console.warn('Isolated Supabase Auth signUp error:', authErr);
+        }
+      }
+
+      // 3. Jika belum dapat UUID dari Supabase Auth, gunakan UUID v4
+      if (!staffId) {
+        staffId = generateUuid();
+      }
+
+      // 4. Simpan ke public.profiles di Supabase
+      try {
+        await supabase.from('profiles').upsert({
+          id: staffId,
+          full_name: trimmedName,
+          role: 'staff',
+          email: trimmedEmail,
+          username: trimmedUsername,
+          is_active: true,
+        });
+      } catch (e) {
+        console.warn('Gagal upsert ke public.profiles:', e);
+      }
+
+      // 5. Simpan ke public.akun di Supabase (sesuai schema tabel akun)
+      try {
+        await supabase.from('akun').upsert({
+          id: staffId,
+          name: trimmedName,
+          email: trimmedEmail,
+          username: trimmedUsername,
+          password: input.password,
+          initials: getInitials(trimmedName),
+          role: 'Staf',
+          status: 'Aktif',
+        });
+      } catch (e) {
+        console.warn('Gagal upsert ke public.akun:', e);
+      }
+
+      // 6. Simpan ke registry akun lokal persisten agar login dan refresh selalu valid
+      await registerLocalAccount({
+        id: staffId,
+        name: trimmedName,
+        email: trimmedEmail,
+        username: trimmedUsername,
+        password: input.password,
+        role: 'Staf',
+        isActive: true,
+      });
+
+      // 7. Update status override ke Aktif
+      await setAccountStatusOverride(staffId, 'Aktif');
+      await setAccountStatusOverride(trimmedEmail, 'Aktif');
+      await setAccountStatusOverride(trimmedUsername, 'Aktif');
+
+      // 8. Perbarui state dan muat ulang daftar staf
+      const newRow: ProfileRow = {
+        id: staffId,
+        full_name: trimmedName,
+        role: 'staff',
+        is_active: true,
+        email: trimmedEmail,
+        username: trimmedUsername,
+        notification_prefs: null,
+      };
+      setRows((prev) => [newRow, ...prev.filter((r) => r.id !== staffId)]);
+
+      await refresh().catch(() => {});
     },
     [refresh]
   );

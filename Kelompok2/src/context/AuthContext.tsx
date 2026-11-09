@@ -13,7 +13,7 @@ import type { UserAccount } from '@/types/profile';
 import type { UserRole } from '@/types/service';
 import { getInitials } from '@/utils/service';
 import { useServiceStore } from '@/context/service-store';
-import { verifyLocalAccount } from '@/lib/account-registry';
+import { getAccountStatusOverride, verifyLocalAccount } from '@/lib/account-registry';
 
 interface AuthContextValue {
   user: UserAccount | null;
@@ -222,6 +222,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (emailOrUsername: string, passwordInput: string) => {
       const trimmed = emailOrUsername.trim();
 
+      // 0. Cek apakah akun tercatat nonaktif di status overrides
+      const override = await getAccountStatusOverride(trimmed);
+      if (override === 'Nonaktif') {
+        throw new Error(
+          'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
+        );
+      }
+
       // 1. Cek terlebih dahulu di registry akun lokal / dummy
       const localResult = await verifyLocalAccount(trimmed, passwordInput);
       if (localResult) {
@@ -237,7 +245,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2. Jika bukan akun lokal, coba autentikasi dengan Supabase Auth
+      // 2. Cek apakah ada di tabel public.akun
+      try {
+        const { data: akunData } = await supabase
+          .from('akun')
+          .select('id, name, username, email, password, role, status')
+          .or(`email.eq.${trimmed.toLowerCase()},username.eq.${trimmed.toLowerCase()}`)
+          .maybeSingle();
+
+        if (akunData) {
+          const akunStatus = (akunData.status || 'Aktif').toLowerCase();
+          const overrideAkun = await getAccountStatusOverride(akunData.id);
+          if (akunStatus === 'nonaktif' || overrideAkun === 'Nonaktif') {
+            throw new Error(
+              'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
+            );
+          }
+
+          if (akunData.password && akunData.password === passwordInput) {
+            const userRole: UserRole =
+              akunData.role.toLowerCase() === 'notaris' ? 'Notaris' : 'Staf';
+            const userAcc: UserAccount = {
+              id: akunData.id,
+              username: akunData.username,
+              password: '',
+              name: akunData.name,
+              email: akunData.email,
+              initials: getInitials(akunData.name),
+              role: userRole,
+              status: 'Aktif',
+            };
+            setRole(userAcc.role);
+            setUser(userAcc);
+            return userAcc;
+          }
+        }
+      } catch (errAkun) {
+        if (errAkun instanceof Error && errAkun.message.includes('dinonaktifkan')) {
+          throw errAkun;
+        }
+      }
+
+      // 3. Jika belum masuk, coba autentikasi dengan Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: trimmed.toLowerCase(),
         password: passwordInput,
