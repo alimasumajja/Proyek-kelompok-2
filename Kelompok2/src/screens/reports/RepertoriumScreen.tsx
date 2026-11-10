@@ -99,7 +99,7 @@ function AktaRow({ akta, onPress }: AktaRowProps) {
         </View>
         <AppText variant="caption">{akta.jenis}</AppText>
         <AppText variant="caption" color={NotaryColors.textSecondary} numberOfLines={1}>
-          {akta.pihak}
+          {akta.pihak.split(/\r?\n/).map((b) => b.trim()).filter(Boolean).join(', ')}
         </AppText>
         <View style={aktaRowStyles.date}>
           <Ionicons name="calendar-outline" size={12} color={NotaryColors.textMuted} />
