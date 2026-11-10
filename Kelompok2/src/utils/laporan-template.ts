@@ -140,6 +140,118 @@ export function hitungAktaTerpisah(akta: Akta[]): number {
   return akta.filter((a) => /waarmerking|fidusia/i.test(a.jenis)).length;
 }
 
+// ───────────────────────── Lampiran NIHIL ─────────────────────────
+
+export interface SelKepala {
+  label: string;
+  colspan?: number;
+  rowspan?: number;
+}
+
+/**
+ * Satu halaman lampiran berisi tabel kosong (NIHIL): Legalisasi, Waarmerking, Protes, Wasiat, Fidusia.
+ * Berupa data sehingga pratinjau di layar dapat memakainya juga.
+ */
+export interface LampiranNihil {
+  judul: string;
+  periode: string;
+  /** Baris header tabel; boleh bersusun dengan colspan/rowspan. */
+  kepala: SelKepala[][];
+  /** Sel di depan dan di belakang tulisan NIHIL pada baris isi (mis. nomor "1", tanggal lapor), bila ada. */
+  awal?: string;
+  akhir?: string;
+  /** Jumlah kolom yang dicakup tulisan NIHIL. */
+  spanNihil: number;
+  teks: string;
+  /** Tabel dengan banyak kolom: huruf dan bantalan sel diperkecil. */
+  rapat?: boolean;
+}
+
+const sel = (label: string, opsi: { colspan?: number; rowspan?: number } = {}): SelKepala => ({ label, ...opsi });
+
+/** Menyusun lima lampiran NIHIL yang mengikuti butir 2 sampai 6 pada surat pengantar. */
+export function susunLampiranNihil(isi: IsiDokumen): LampiranNihil[] {
+  const periodeUpper = isi.periodeLabel.toUpperCase();
+  const periodeBulan = `PERIODE BULAN ${periodeUpper}`;
+  // Tanggal lapor memakai tanggal surat, yaitu bagian setelah "Kota, " pada lokasiTanggal.
+  const tanggalLapor = isi.lokasiTanggal.replace(/^[^,]*,\s*/, '');
+
+  return [
+    {
+      judul: 'SALINAN BUKU SURAT DIBAWAH TANGAN YANG DISAHKAN',
+      periode: periodeBulan,
+      kepala: [[sel('NO. URUT'), sel('TANGGAL SURAT'), sel('SIFAT AKTA'), sel('NAMA PENGHADAP DAN ATAU YANG DIWAKILI/KUASA')]],
+      spanNihil: 4,
+      teks: 'N I H I L',
+    },
+    {
+      judul: 'SALINAN BUKU DAFTAR SURAT DIBAWAH TANGAN YANG DIBUKUKAN',
+      periode: periodeBulan,
+      kepala: [
+        [
+          sel('NO. URUT'),
+          sel('TANGGAL SURAT'),
+          sel('TANGGAL DIDAFTARKAN'),
+          sel('SIFAT SURAT'),
+          sel('NAMA YANG MENANDATANGANI DAN ATAU YANG DIWAKILI/KUASA'),
+        ],
+      ],
+      spanNihil: 5,
+      teks: 'N I H I L',
+    },
+    {
+      judul: 'SALINAN BUKU DAFTAR PROTES',
+      periode: `PERIODE ${periodeUpper}`,
+      kepala: [
+        [
+          sel('NO. URUT'),
+          sel('NOMOR AKTA'),
+          sel('TANGGAL'),
+          sel('YANG DITAGIH'),
+          sel('YANG MENAGIH'),
+          sel('TANGGAL WESEL/CHEQUE'),
+          sel('TANGGAL JATUH WAKTU WESEL/CHEQUE'),
+        ],
+      ],
+      spanNihil: 7,
+      teks: 'N I H I L',
+    },
+    {
+      judul: 'LAPORAN WASIAT',
+      periode: periodeBulan,
+      kepala: [
+        [sel('NO', { rowspan: 2 }), sel('Pemberi Wasiat', { colspan: 5 }), sel('Akta Wasiat', { colspan: 5 }), sel('Tanggal Lapor', { rowspan: 2 })],
+        [
+          sel('Nama Lengkap Pemberi Wasiat'),
+          sel('Dahulu Bernama'),
+          sel('Tempat Lahir'),
+          sel('Tanggal Bulan dan Tahun Lahir'),
+          sel('Alamat Pemberi Wasiat'),
+          sel('Nomor Akta'),
+          sel('Tanggal Bulan dan Tahun Akta'),
+          sel('No Rep.'),
+          sel('Jenis Akta'),
+        ],
+      ],
+      awal: '1',
+      akhir: tanggalLapor,
+      spanNihil: 10,
+      teks: 'NIHIL',
+      rapat: true,
+    },
+    {
+      judul: 'LAPORAN AKTA JAMINAN FIDUSIA',
+      periode: periodeBulan,
+      kepala: [
+        [sel('NO', { rowspan: 2 }), sel('NOMOR AKTA', { rowspan: 2 }), sel('TANGGAL AKTA', { rowspan: 2 }), sel('PARA PIHAK', { colspan: 2 }), sel('NO. SERTIFIKAT JAMINAN FIDUSIA', { rowspan: 2 })],
+        [sel('NAMA PEMBERI FIDUSIA'), sel('NAMA PENERIMA FIDUSIA & TEMPAT KEDUDUKAN PROVINSI')],
+      ],
+      spanNihil: 6,
+      teks: 'NIHIL',
+    },
+  ];
+}
+
 // ───────────────────────── HTML untuk PDF dan Word ─────────────────────────
 
 type ModeRender = 'pdf' | 'word';
@@ -218,6 +330,8 @@ function buatCss(isi: IsiDokumen): string {
   table.daftar td p.qq { margin-left: 14px; }
   thead { display: table-header-group; }
   .nihil { text-align: center; font-weight: bold; letter-spacing: 4px; }
+  table.daftar.rapat th, table.daftar.rapat td { padding: 3px 3px; font-size: ${u.tabel - 1.5}pt; }
+  table.daftar td.nihil { padding: 10px 6px; }
 
   /* Tanda tangan */
   table.ttd { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
@@ -328,15 +442,42 @@ function htmlDaftar(isi: IsiDokumen, mode: ModeRender): string {
     ${htmlTtd(isi)}`;
 }
 
+/** Satu halaman lampiran NIHIL: kop, judul, tabel kosong, dan tanda tangan. */
+function htmlLampiranNihil(l: LampiranNihil, isi: IsiDokumen): string {
+  const atribut = (s: SelKepala) =>
+    `${s.colspan ? ` colspan="${s.colspan}"` : ''}${s.rowspan ? ` rowspan="${s.rowspan}"` : ''}`;
+  const kepala = l.kepala
+    .map((baris) => `<tr>${baris.map((s) => `<th${atribut(s)}>${escapeHtml(s.label)}</th>`).join('')}</tr>`)
+    .join('');
+  // Tulisan "NIHIL" tanpa spasi tidak diberi jarak antarhuruf.
+  const gaya = l.teks.includes(' ') ? '' : ' style="letter-spacing:0"';
+  const barisNihil = `<tr>${l.awal ? `<td class="tengah">${escapeHtml(l.awal)}</td>` : ''}<td colspan="${l.spanNihil}" class="nihil"${gaya}>${escapeHtml(l.teks)}</td>${l.akhir ? `<td class="tengah">${escapeHtml(l.akhir)}</td>` : ''}</tr>`;
+
+  return `${htmlKop(isi.kop)}
+    <p class="judul">${escapeHtml(l.judul)}</p>
+    <p class="judul">${escapeHtml(l.periode)}</p>
+    <p class="jeda">&nbsp;</p>
+    <table class="daftar${l.rapat ? ' rapat' : ''}"><thead>${kepala}</thead><tbody>${barisNihil}</tbody></table>
+    ${htmlTtd(isi)}`;
+}
+
+/**
+ * Membungkus satu halaman. Word mengabaikan page-break-before pada <div>, dan membuang <br clear="all"> yang
+ * langsung diikuti tabel; paragraf kecil yang membawa page-break-before selalu dihormati.
+ */
+function halamanBaru(mode: ModeRender, konten: string): string {
+  if (mode === 'word') {
+    const pemisah = `<p style="page-break-before:always;margin:0;font-size:1pt;line-height:1pt;mso-line-height-rule:exactly">&nbsp;</p>`;
+    return `${pemisah}<div>${konten}</div>`;
+  }
+  return `<div class="halaman-baru">${konten}</div>`;
+}
+
 function isiBody(isi: IsiDokumen, mode: ModeRender): string {
-  // Word mengabaikan page-break-before pada <div>, dan membuang <br clear="all"> yang langsung diikuti tabel.
-  // Paragraf kecil yang membawa page-break-before selalu dihormati, apa pun elemen berikutnya.
-  const pemisah =
-    mode === 'word'
-      ? `<p style="page-break-before:always;margin:0;font-size:1pt;line-height:1pt;mso-line-height-rule:exactly">&nbsp;</p>`
-      : '';
-  const kelasDaftar = mode === 'pdf' ? 'halaman-baru' : '';
-  return `<div>${htmlSurat(isi)}</div>${pemisah}<div class="${kelasDaftar}">${htmlDaftar(isi, mode)}</div>`;
+  const lampiran = susunLampiranNihil(isi)
+    .map((l) => halamanBaru(mode, htmlLampiranNihil(l, isi)))
+    .join('');
+  return `<div>${htmlSurat(isi)}</div>${halamanBaru(mode, htmlDaftar(isi, mode))}${lampiran}`;
 }
 
 /** HTML lengkap untuk dicetak menjadi PDF. */
