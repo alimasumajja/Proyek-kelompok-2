@@ -50,8 +50,34 @@ export const STATUS_VALIDASI_TONE: Record<StatusValidasi, BadgeTone> = {
 /** Draf: belum disetujui · Revisi Diminta: ada catatan revisi · Final: disetujui dan dikunci. */
 export type StatusDokumen = 'Draf' | 'Revisi Diminta' | 'Final';
 
-/** Nama template format dokumen laporan. */
-export type NamaTemplate = 'Ringkas' | 'Lengkap';
+export type UkuranFont = 'Kecil' | 'Sedang' | 'Besar';
+export type LebarMargin = 'Sempit' | 'Normal' | 'Lebar';
+
+/** Kop surat dan blok tanda tangan laporan (format Laporan Bulanan Notaris ke MPDN). */
+export interface KopLaporan {
+  /** Nama pada kop, mis. "Nama Notaris, S.H., M.Kn." */
+  namaNotaris: string;
+  /** Mis. "Notaris di Kabupaten Majalengka". */
+  jabatan: string;
+  /** Mis. "Jawa Barat". Boleh kosong. */
+  wilayah: string;
+  alamat: string;
+  /** Mis. "Nomor HP 0812...". Boleh kosong. */
+  telepon: string;
+  /** Kota pada tanda tangan, mis. "Majalengka". */
+  kota: string;
+  /** Nama pada tanda tangan, mis. "NAMA NOTARIS, S.H., M.Kn." */
+  namaTtd: string;
+}
+
+/** Pengaturan tampilan dokumen laporan. Satu pengaturan untuk seluruh kantor. */
+export interface PengaturanLaporan {
+  kop: KopLaporan;
+  /** Penerima surat, satu baris per teks (setelah "Kepada Yth."). */
+  penerima: string;
+  ukuranFont: UkuranFont;
+  margin: LebarMargin;
+}
 
 /** Salinan data yang dikunci saat laporan disetujui (dasar audit). */
 export interface SnapshotDokumen {
@@ -59,6 +85,10 @@ export interface SnapshotDokumen {
   /** Waktu persetujuan, format ISO. */
   disetujuiPada: string;
   akta: Akta[];
+  /** Nomor surat saat disetujui. */
+  nomorSurat?: string;
+  /** Pengaturan tampilan saat disetujui. Kosong pada snapshot lama. */
+  pengaturan?: PengaturanLaporan;
 }
 
 /** Status dokumen laporan untuk satu periode. */
@@ -67,6 +97,8 @@ export interface DokumenLaporan {
   /** Jumlah versi yang sudah final. 0 = belum pernah disetujui. */
   versiFinal: number;
   catatanRevisi: string;
+  /** Nomor surat pengantar, mis. 005/NOT/X/2026. Kosong bila belum diisi. */
+  nomorSurat: string;
   snapshot: SnapshotDokumen | null;
 }
 
