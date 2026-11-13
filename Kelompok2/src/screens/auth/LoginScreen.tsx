@@ -31,7 +31,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setErrorMessage(null);
     if (!email.trim() || !password) {
-      const msg = 'Masukkan email/username dan kata sandi.';
+      const msg = 'Masukkan email dan kata sandi.';
       setErrorMessage(msg);
       Alert.alert('Data belum lengkap', msg);
       return;
@@ -84,12 +84,12 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email atau Username</Text>
+          <Text style={styles.inputLabel}>Email</Text>
           <View style={styles.inputWrapper}>
             <Feather name="user" size={20} color="#7a7a7a" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Masukkan email atau username"
+              placeholder="Masukkan email"
               value={email}
               onChangeText={(t) => {
                 setEmail(t);

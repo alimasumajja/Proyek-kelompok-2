@@ -13,12 +13,11 @@ import type { UserAccount } from '@/types/profile';
 import type { UserRole } from '@/types/service';
 import { getInitials } from '@/utils/service';
 import { useServiceStore } from '@/context/service-store';
-import { getAccountStatusOverride, verifyLocalAccount } from '@/lib/account-registry';
 
 interface AuthContextValue {
   user: UserAccount | null;
   loading: boolean;
-  login: (emailOrUsername: string, password: string) => Promise<UserAccount>;
+  login: (email: string, password: string) => Promise<UserAccount>;
   logout: () => Promise<void>;
   checkActiveStatus: () => Promise<boolean>;
 }
@@ -110,20 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkActiveStatus = useCallback(async (): Promise<boolean> => {
     if (!user) return false;
 
-    // Untuk akun lokal mock
-    if (user.id.startsWith('acc-') || user.id.startsWith('mock-') || user.id.startsWith('local-')) {
-      const localResult = await verifyLocalAccount(user.email || user.username, user.password || '');
-      if (localResult && localResult.isInactive) {
-        await logout();
-        Alert.alert(
-          'Akses Ditolak',
-          'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
-        );
-        return false;
-      }
-      return true;
-    }
-
     // Untuk akun Supabase
     try {
       const { data, error } = await supabase
@@ -178,32 +163,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
 
-    // 1. Cek realtime jika akun Supabase
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    if (!user.id.startsWith('acc-') && !user.id.startsWith('mock-')) {
-      channel = supabase
-        .channel(`user-profile-status-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'profiles',
-            filter: `id=eq.${user.id}`,
-          },
-          (payload) => {
-            const updated = payload.new as { is_active?: boolean };
-            if (updated && updated.is_active === false) {
-              void logout();
-              Alert.alert(
-                'Akses Ditolak',
-                'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
-              );
-            }
+    // Semua sesi berasal dari Supabase Auth; status profil dipantau melalui Realtime.
+    const channel = supabase
+      .channel(`user-profile-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as { is_active?: boolean };
+          if (updated && updated.is_active === false) {
+            void logout();
+            Alert.alert(
+              'Akses Ditolak',
+              'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
+            );
           }
-        )
-        .subscribe();
-    }
+        }
+      )
+      .subscribe();
 
     // 2. Cek saat user kembali ke app (AppState)
     const appStateSub = AppState.addEventListener('change', (nextState) => {
@@ -219,82 +201,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id, logout, checkActiveStatus]);
 
   const login = useCallback(
-    async (emailOrUsername: string, passwordInput: string) => {
-      const trimmed = emailOrUsername.trim();
-
-      // 0. Cek apakah akun tercatat nonaktif di status overrides
-      const override = await getAccountStatusOverride(trimmed);
-      if (override === 'Nonaktif') {
-        throw new Error(
-          'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-        );
+    async (emailInput: string, passwordInput: string) => {
+      const email = emailInput.trim().toLowerCase();
+      if (!email || !passwordInput) {
+        throw new Error('Email dan kata sandi wajib diisi.');
       }
 
-      // 1. Cek terlebih dahulu di registry akun lokal / dummy
-      const localResult = await verifyLocalAccount(trimmed, passwordInput);
-      if (localResult) {
-        if (!localResult.ok) {
-          throw new Error(
-            localResult.error || 'Akun Anda tidak aktif atau kata sandi tidak sesuai.'
-          );
-        }
-        if (localResult.account) {
-          setRole(localResult.account.role);
-          setUser(localResult.account);
-          return localResult.account;
-        }
-      }
-
-      // 2. Cek apakah ada di tabel public.akun
-      try {
-        const { data: akunData } = await supabase
-          .from('akun')
-          .select('id, name, username, email, password, role, status')
-          .or(`email.eq.${trimmed.toLowerCase()},username.eq.${trimmed.toLowerCase()}`)
-          .maybeSingle();
-
-        if (akunData) {
-          const akunStatus = (akunData.status || 'Aktif').toLowerCase();
-          const overrideAkun = await getAccountStatusOverride(akunData.id);
-          if (akunStatus === 'nonaktif' || overrideAkun === 'Nonaktif') {
-            throw new Error(
-              'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-            );
-          }
-
-          if (akunData.password && akunData.password === passwordInput) {
-            const userRole: UserRole =
-              akunData.role.toLowerCase() === 'notaris' ? 'Notaris' : 'Staf';
-            const userAcc: UserAccount = {
-              id: akunData.id,
-              username: akunData.username,
-              password: '',
-              name: akunData.name,
-              email: akunData.email,
-              initials: getInitials(akunData.name),
-              role: userRole,
-              status: 'Aktif',
-            };
-            setRole(userAcc.role);
-            setUser(userAcc);
-            return userAcc;
-          }
-        }
-      } catch (errAkun) {
-        if (errAkun instanceof Error && errAkun.message.includes('dinonaktifkan')) {
-          throw errAkun;
-        }
-      }
-
-      // 3. Jika belum masuk, coba autentikasi dengan Supabase Auth
+      // Satu-satunya sumber autentikasi adalah Supabase Auth.
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: trimmed.toLowerCase(),
+        email,
         password: passwordInput,
       });
 
       if (error) {
         const errorMsg = error.message.toLowerCase();
-        // Deteksi jika akun di-ban / dinonaktifkan di Supabase Auth
         if (
           errorMsg.includes('banned') ||
           errorMsg.includes('disabled') ||
@@ -307,7 +227,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Email atau kata sandi tidak sesuai.');
       }
 
-      if (!data.user?.email) throw new Error('Data pengguna dari Supabase tidak lengkap.');
+      if (!data.user?.email) {
+        throw new Error('Data pengguna dari Supabase tidak lengkap.');
+      }
 
       try {
         const profile = await fetchUserProfile(data.user.id, data.user.email);
