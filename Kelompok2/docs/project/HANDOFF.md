@@ -8,16 +8,20 @@
 - **Database:** Migrasi lokal berjumlah 4 file; remote DB memiliki tambahan migrasi `20261110224714_use_invoker_for_profile_audit_rpcs.sql` yang kini telah dibuat secara lokal.
 
 ## Pekerjaan Terbaru
-- Deploy Edge Functions untuk manajemen staf.
-- Penambahan migrasi `20261110224714_use_invoker_for_profile_audit_rpcs.sql`.
-- Lint dan tipe‑check TypeScript berhasil (tidak ada error).
-- Dokumentasi proyek (KonteksProyek, PRD, AppReference) telah dibaca dan diverifikasi.
+- Deploy Edge Functions untuk manajemen staf (`create-staff`, `manage-staff`).
+- Verifikasi dan penegakan RLS: kebijakan `Akses bebas akun praktikum` dihapus, tabel `profile_audit_logs` dilindungi SELECT khusus notaris.
+- Integrasi **Service Detail** dengan Supabase RPCs & tabel riil:
+  - Perpindahan tahap (`change_service_stage`) dengan audit log otomatis dan validasi skip/repeat.
+  - Perubahan penugasan staf dan target tanggal (`update_service_assignment`) khusus notaris.
+  - Penambahan catatan progres & kendala (`service_notes`) dengan mapping kategori database.
+  - Perhitungan durasi tahap dan durasi total berbasis riwayat riil (`service_stage_history`).
+  - Pemilihan penanggung jawab dari daftar staf aktif database (`profiles`).
+- Verifikasi kompilasi TypeScript (`tsc --noEmit`) dan ESLint 100% lolos tanpa error.
 
 ## Fokus Selanjutnya (Prioritas 2)
-1. Integrasi layanan **Service Detail** dengan Supabase RPCs.
-2. Implementasi notifikasi real‑time.
-3. Penyempurnaan UI untuk menampilkan data nyata (bukan dummy).
-4. Verifikasi dan penyesuaian RLS serta audit log.
+1. ~~Integrasi layanan **Service Detail** dengan Supabase RPCs.~~ (Selesai)
+2. Implementasi notifikasi real‑time (Supabase Realtime pada `notifications`).
+3. Penyempurnaan layar Beranda, Layanan, dan Repertorium untuk menampilkan data nyata (menggantikan sisa data dummy).
 
 ## Risiko & Isu Terbuka
 - UI masih mengandalkan data dummy, sehingga fungsionalitas tidak dapat diuji end‑to‑end.

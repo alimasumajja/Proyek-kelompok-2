@@ -43,3 +43,23 @@ export function monthShortUpper(date: Date): string {
 export function formatInputDate(date: Date): string {
   return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}`;
 }
+
+/** Date → "18 Mar 2026, 14.30" */
+export function formatDateTimeId(date: Date): string {
+  const time = `${pad(date.getHours())}.${pad(date.getMinutes())}`;
+  return `${formatDateId(date)}, ${time}`;
+}
+
+/** Date → "18 Mar · 14.30" */
+export function formatTimeShort(date: Date): string {
+  const time = `${pad(date.getHours())}.${pad(date.getMinutes())}`;
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} · ${time}`;
+}
+
+/** Hitung durasi hari antar dua tanggal */
+export function calculateDurationDays(from: Date, to: Date = new Date()): string {
+  const diffMs = Math.max(0, to.getTime() - from.getTime());
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days === 0) return '< 1 hari';
+  return `${days} hari`;
+}

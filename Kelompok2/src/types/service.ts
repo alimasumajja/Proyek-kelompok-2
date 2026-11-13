@@ -38,6 +38,16 @@ export interface ServiceItem {
   clientContact?: string;
   description?: string;
   statusReason?: string;
+  serviceTypeId?: string;
+  allowsRegistrationSkip?: boolean;
+  supportStaffName?: string;
+}
+
+export interface StageTiming {
+  currentStageStartedAt: string;
+  currentStageDuration: string;
+  totalDuration: string;
+  completedStageAt: string;
 }
 
 export interface OperationalSummary {

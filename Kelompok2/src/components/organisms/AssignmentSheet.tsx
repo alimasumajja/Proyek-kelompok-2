@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { staffDirectory } from '@/data/dummy';
-import type { ServiceItem } from '@/types/service';
+import type { ServiceItem, StaffRef } from '@/types/service';
 import { displayDateToInput, parseInputDate } from '@/utils/date';
 import { Button } from '../atoms';
 import { BottomSheet, DateField, InfoNote, SelectField } from '../molecules';
 
 export interface AssignmentInput {
+  staffId?: string;
   staffName: string;
   dueDate: Date;
 }
@@ -14,23 +15,28 @@ export interface AssignmentInput {
 interface AssignmentSheetProps {
   visible: boolean;
   service: ServiceItem;
+  staffList?: StaffRef[];
   onClose: () => void;
   onSave: (input: AssignmentInput) => void;
 }
 
 /** Sheet "Ubah Penugasan & Target" (khusus Notaris) — perubahan masuk riwayat audit. */
-export function AssignmentSheet({ visible, service, onClose, onSave }: AssignmentSheetProps) {
+export function AssignmentSheet({ visible, service, staffList, onClose, onSave }: AssignmentSheetProps) {
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Ubah Penugasan & Target">
-      <AssignmentForm service={service} onSave={onSave} />
+      <AssignmentForm service={service} staffList={staffList} onSave={onSave} />
     </BottomSheet>
   );
 }
 
-function AssignmentForm({ service, onSave }: Pick<AssignmentSheetProps, 'service' | 'onSave'>) {
+function AssignmentForm({ service, staffList, onSave }: Pick<AssignmentSheetProps, 'service' | 'staffList' | 'onSave'>) {
   const [staffName, setStaffName] = useState(service.assignedStaff.name);
   const [dateText, setDateText] = useState(displayDateToInput(service.dueDate));
   const [error, setError] = useState<string | undefined>();
+
+  const availableStaffNames = staffList && staffList.length > 0
+    ? staffList.map((s) => s.name)
+    : staffDirectory;
 
   const submit = () => {
     const dueDate = parseInputDate(dateText);
@@ -38,7 +44,12 @@ function AssignmentForm({ service, onSave }: Pick<AssignmentSheetProps, 'service
       setError('Pilih tanggal target penyelesaian.');
       return;
     }
-    onSave({ staffName, dueDate });
+    const matchedStaff = staffList?.find((s) => s.name === staffName);
+    onSave({
+      staffId: matchedStaff?.id ?? service.assignedStaff.id,
+      staffName,
+      dueDate,
+    });
   };
 
   return (
@@ -46,7 +57,7 @@ function AssignmentForm({ service, onSave }: Pick<AssignmentSheetProps, 'service
       <SelectField
         label="Penanggung jawab"
         value={staffName}
-        options={staffDirectory}
+        options={availableStaffNames}
         onChange={setStaffName}
       />
       <DateField
