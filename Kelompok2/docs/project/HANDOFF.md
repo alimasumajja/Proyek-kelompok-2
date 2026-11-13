@@ -20,12 +20,19 @@
   - Integrasi tabel `notifications` riil di Supabase (query tersaring RLS otomatis `recipient_id = auth.uid()`).
   - Langganan Realtime Postgres Changes (`INSERT`, `UPDATE`, `DELETE`) untuk pembaruan instan tanpa reload.
   - Fitur tandai dibaca (`markAllNotificationsRead` & `markNotificationRead`) terhubung langsung ke database.
-- Verifikasi kompilasi TypeScript (`tsc --noEmit`) dan ESLint 100% lolos tanpa error.
+- **Penyempurnaan Layar Beranda, Layanan, dan Repertorium dengan Data Riil Supabase**:
+  - Beranda Notaris (`HomeScreen.tsx`): Integrasi log aktivitas riil dari `service_activity_logs`, ringkasan operasional dari query database riil beserta kendala (`service_notes`), dan penambahan pull-to-refresh (`RefreshControl`).
+  - Beranda Staf (`StaffDashboard.tsx`): Pembersihan data dummy (`todayLabel` dihapus, diganti format tanggal dinamis), integrasi riwayat aktivitas staf mandiri dari `service_activity_logs`, dan penambahan pull-to-refresh.
+  - Layanan (`LayananScreen.tsx`): Penambahan pull-to-refresh langsung ke Supabase, pemetaan status `Perlu Perhatian` berbasis kendala `service_notes` dan tahap `Revisi Draf`.
+  - Repertorium & Laporan (`laporan-store.ts`, `RepertoriumScreen.tsx`): Pemuatan otomatis data akta dan dokumen langsung saat layar dibuka bila belum termuat, sinkronisasi tabel `akta` riil.
+  - Pembersihan dummy imports: `AssignmentSheet` dan `profile-store` dibersihkan dari ketergantungan `data/dummy`.
+- Verifikasi kompilasi TypeScript (`tsc --noEmit`), ESLint, dan bundling Android (`expo export --platform android`) 100% lolos tanpa error.
 
-## Fokus Selanjutnya (Prioritas 2)
+## Fokus Selanjutnya (Prioritas Berikutnya)
 1. ~~Integrasi layanan **Service Detail** dengan Supabase RPCs.~~ (Selesai)
 2. ~~Implementasi notifikasi real‑time (Supabase Realtime pada `notifications`).~~ (Selesai)
-3. Penyempurnaan layar Beranda, Layanan, dan Repertorium untuk menampilkan data nyata (menggantikan sisa data dummy).
+3. ~~Penyempurnaan layar Beranda, Layanan, dan Repertorium untuk menampilkan data nyata.~~ (Selesai)
+4. Pengujian sinkronisasi sesi login dan hak akses (Notaris vs Staf) end-to-end.
 
 ## Risiko & Isu Terbuka
 - UI masih mengandalkan data dummy, sehingga fungsionalitas tidak dapat diuji end‑to‑end.

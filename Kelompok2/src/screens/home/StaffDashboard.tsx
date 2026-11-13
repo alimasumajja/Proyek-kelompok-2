@@ -1,12 +1,14 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useServiceStore } from '@/context/service-store';
-import { todayLabel } from '@/data/dummy';
+import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
-import type { ServiceItem, ServiceTab } from '@/types/service';
-import { getRecentActivities, sortByDueDate } from '@/utils/activity';
+import type { ServiceActivity, ServiceItem, ServiceTab } from '@/types/service';
+import { sortByDueDate } from '@/utils/activity';
+import { formatRelativeTime } from '@/utils/date';
 import { getNearestDeadline, getPriorityServices, summarizeServices } from '@/utils/service';
 import { Button } from '@/components/atoms';
 import { DeadlineCard, EmptyState, SectionHeader, ServiceCard } from '@/components/molecules';
@@ -38,9 +40,105 @@ export function StaffDashboard({
   onAddService,
 }: StaffDashboardProps) {
   useStatusBarStyle('light');
-  const { notes, activities } = useServiceStore();
-  const { services, unreadCount } = useSession();
+  const { notes, refreshServices, refreshNotifications } = useServiceStore();
+  const { services, unreadCount, servicesLoading } = useSession();
   const { user } = useAuth();
+
+  const dateLabel = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date()).toUpperCase();
+
+  const [staffActivities, setStaffActivities] = useState<ServiceActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadStaffActivities = useCallback(async () => {
+    setActivitiesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('service_activity_logs')
+        .select(`
+          id, service_id, action, details, created_at,
+          actor:profiles!service_activity_logs_actor_id_fkey(full_name),
+          service:services!service_activity_logs_service_id_fkey(service_number, client_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(4);
+
+      if (error || !data) {
+        setStaffActivities([]);
+        return;
+      }
+
+      const mapped: ServiceActivity[] = data.map((act) => {
+        const actorValue = act.actor as unknown as { full_name: string | null } | { full_name: string | null }[] | null;
+        const actorProfile = Array.isArray(actorValue) ? actorValue[0] : actorValue;
+        const actorName = actorProfile?.full_name?.trim() || 'Sistem';
+
+        const serviceValue = act.service as unknown as { service_number: string; client_name: string } | { service_number: string; client_name: string }[] | null;
+        const serviceInfo = Array.isArray(serviceValue) ? serviceValue[0] : serviceValue;
+        const servicePrefix = serviceInfo?.service_number ? `${serviceInfo.service_number} · ` : '';
+
+        const details = (act.details ?? {}) as Record<string, any>;
+        let title = 'Aktivitas layanan';
+        let text = `${servicePrefix}${actorName} melakukan pembaruan`;
+        let tone: 'green' | 'blue' | 'amber' = 'blue';
+
+        if (act.action === 'service_created') {
+          title = 'Layanan dibuat';
+          text = `${servicePrefix}Dibuat oleh ${actorName}`;
+          tone = 'green';
+        } else if (act.action === 'service_stage_changed') {
+          const toStage = details.to_stage;
+          title = details.change_type === 'skip' ? 'Tahap dilewati' : details.change_type === 'repeat' ? 'Tahap diulang' : 'Tahap diperbarui';
+          text = `${servicePrefix}${actorName} memperbarui ke ${toStage ?? 'tahap berikutnya'}`;
+          tone = details.change_type === 'skip' ? 'amber' : 'green';
+        } else if (act.action === 'service_member_added' || act.action === 'service_member_updated') {
+          title = 'Penugasan diperbarui';
+          text = `${servicePrefix}Diperbarui oleh ${actorName}`;
+          tone = 'blue';
+        } else if (act.action === 'service_note_added') {
+          const isObstacle = details.category === 'obstacle';
+          title = isObstacle ? 'Kendala dicatat' : 'Catatan ditambahkan';
+          text = `${servicePrefix}${actorName} menambahkan ${isObstacle ? 'kendala' : 'catatan'}`;
+          tone = isObstacle ? 'amber' : 'blue';
+        }
+
+        return {
+          id: act.id,
+          title,
+          text,
+          time: formatRelativeTime(new Date(act.created_at)),
+          tone,
+        };
+      });
+
+      setStaffActivities(mapped);
+    } catch {
+      setStaffActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadStaffActivities();
+    }, [loadStaffActivities]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refreshServices(),
+      refreshNotifications(),
+      loadStaffActivities(),
+    ]);
+    setRefreshing(false);
+  }, [refreshServices, refreshNotifications, loadStaffActivities]);
 
   const openService = (service: ServiceItem) => onOpenService(service.id);
 
@@ -55,13 +153,21 @@ export function StaffDashboard({
   );
   const summary = summarizeServices(services, issueCount);
   const deadline = getNearestDeadline(services);
-  const recent = getRecentActivities(services, activities, 4);
 
   return (
     <View style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || servicesLoading || activitiesLoading}
+            onRefresh={onRefresh}
+          />
+        }
+      >
         <HomeHeader
-          dateLabel={todayLabel}
+          dateLabel={dateLabel}
           greeting={`Selamat pagi, ${user?.name?.split(' ')[0] ?? 'Staf'}`}
           subtitle="Berikut tugas Anda hari ini."
           userInitials={user?.initials ?? 'ST'}
@@ -139,10 +245,10 @@ export function StaffDashboard({
           </View>
         ) : null}
 
-        {recent.length > 0 ? (
+        {staffActivities.length > 0 ? (
           <View style={styles.section}>
             <SectionHeader eyebrow="AKTIVITAS" title="Aktivitas Saya" />
-            <HistoryPanel activities={recent} />
+            <HistoryPanel activities={staffActivities} />
           </View>
         ) : null}
       </ScrollView>

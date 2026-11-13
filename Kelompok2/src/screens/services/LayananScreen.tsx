@@ -174,6 +174,8 @@ export function LayananScreen({
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ServiceCard item={item} onPress={openService} />}
         ListHeaderComponent={header}
+        refreshing={servicesLoading}
+        onRefresh={() => void refreshServices()}
         ListEmptyComponent={
           servicesLoading ? (
             <View style={styles.loading}>

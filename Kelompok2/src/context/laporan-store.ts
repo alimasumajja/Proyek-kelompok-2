@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Alert } from 'react-native';
 import {
   ambilDokumen,
@@ -132,7 +132,13 @@ const subscribe = (listener: () => void) => {
 const getSnapshot = () => state;
 
 export function useLaporanStore(): LaporanState {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const store = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  useEffect(() => {
+    if (!store.dimuat && !store.memuat) {
+      void muatSemua();
+    }
+  }, [store.dimuat, store.memuat]);
+  return store;
 }
 
 /** Tampilkan kegagalan ke pengguna tanpa mengubah layar yang sudah ada. */

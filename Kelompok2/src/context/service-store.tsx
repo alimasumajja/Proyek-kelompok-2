@@ -174,7 +174,8 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         service_members(
           user_id, member_role,
           profiles!service_members_user_id_fkey(id, full_name)
-        )
+        ),
+        service_notes(id, category)
       `,
         )
         .order("created_at", { ascending: false });
@@ -184,12 +185,25 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         return false;
       }
 
+      const initialNotes: Record<string, ServiceNote[]> = {};
+
       const mapped: ServiceItem[] = (data ?? []).map((row) => {
         const members = (row.service_members ?? []) as unknown as {
           user_id: string;
           member_role: "responsible" | "support";
           profiles: { id: string; full_name: string | null } | { id: string; full_name: string | null }[] | null;
         }[];
+
+        const rawNotes = (row.service_notes ?? []) as unknown as { id: string; category: string }[];
+        if (rawNotes.length > 0) {
+          initialNotes[row.id] = rawNotes.map((n) => ({
+            id: n.id,
+            category: n.category === "obstacle" ? "Kendala" : "Pembaruan Progres",
+            text: "",
+            author: "",
+            time: "",
+          }));
+        }
 
         const responsible = members.find((member) => member.member_role === "responsible") ?? members[0];
         const support = members.find((member) => member.member_role === "support");
@@ -214,8 +228,21 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         today.setHours(0, 0, 0, 0);
 
         const isOverdue = row.status === "active" && targetDate !== null && targetDate.getTime() < today.getTime();
+        const hasObstacle = rawNotes.some((n) => n.category === "obstacle");
+        const isAttention = row.status === "active" && !isOverdue && (hasObstacle || row.current_stage === "Revisi Draf");
 
-        const status: ServiceItem["status"] = row.status === "completed" ? "Selesai" : row.status === "cancelled" ? "Dibatalkan" : row.status === "paused" ? "Ditunda" : isOverdue ? "Terlambat" : "Aktif";
+        const status: ServiceItem["status"] =
+          row.status === "completed"
+            ? "Selesai"
+            : row.status === "cancelled"
+            ? "Dibatalkan"
+            : row.status === "paused"
+            ? "Ditunda"
+            : isOverdue
+            ? "Terlambat"
+            : isAttention
+            ? "Perlu Perhatian"
+            : "Aktif";
 
         const priority: ServicePriority = row.priority === "high" ? "Tinggi" : row.priority === "low" ? "Rendah" : "Sedang";
 
@@ -256,6 +283,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         };
       });
 
+      setNotes((prev) => ({ ...initialNotes, ...prev }));
       setServices(mapped);
       return true;
     } catch (error) {

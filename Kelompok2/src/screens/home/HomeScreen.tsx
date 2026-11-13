@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useServiceStore } from '@/context/service-store';
@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
 import type { ActivityItem, ServiceItem, ServiceTab } from '@/types/service';
+import { formatRelativeTime } from '@/utils/date';
 import { getNearestDeadline, getPriorityServices, summarizeServices } from '@/utils/service';
 import { DeadlineCard, EmptyState, SectionHeader, ServiceCard } from '@/components/molecules';
 import { ActivityTimeline, HomeHeader, SummaryGrid } from '@/components/organisms';
@@ -35,8 +36,8 @@ export function HomeScreen({
   onAddService,
 }: HomeScreenProps) {
   useStatusBarStyle('light');
-  const { notes } = useServiceStore();
-  const { account, isNotaris, services, unreadCount } = useSession();
+  const { notes, refreshServices, refreshNotifications } = useServiceStore();
+  const { account, isNotaris, services, unreadCount, servicesLoading } = useSession();
   const dateLabel = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     day: 'numeric',
@@ -45,85 +46,81 @@ export function HomeScreen({
   }).format(new Date()).toUpperCase();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [activitiesLoadFailed, setActivitiesLoadFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadRecentActivities = useCallback(async () => {
+    if (!isNotaris) return;
+    const { data, error } = await supabase
+      .from('service_activity_logs')
+      .select(`
+        id, service_id, action, details, created_at,
+        actor:profiles!service_activity_logs_actor_id_fkey(full_name),
+        service:services!service_activity_logs_service_id_fkey(service_number, client_name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      setActivities([]);
+      setActivitiesLoadFailed(true);
+      return;
+    }
+
+    setActivitiesLoadFailed(false);
+
+    const mapped = (data ?? []).map((row): ActivityItem => {
+      const actorValue = row.actor as unknown as { full_name: string | null } | { full_name: string | null }[] | null;
+      const actor = Array.isArray(actorValue) ? actorValue[0] : actorValue;
+      const serviceValue = row.service as unknown as { service_number: string; client_name: string } | { service_number: string; client_name: string }[] | null;
+      const service = Array.isArray(serviceValue) ? serviceValue[0] : serviceValue;
+      const details = row.details as { member_role?: string } | null;
+
+      let action = 'melakukan pembaruan pada layanan';
+      if (row.action === 'service_created') action = 'membuat layanan';
+      else if (row.action === 'service_member_added') {
+        action = details?.member_role === 'support'
+          ? 'menambahkan staf pendukung pada layanan'
+          : 'menetapkan penanggung jawab layanan';
+      } else if (row.action.includes('issue')) action = 'mencatat kendala pada layanan';
+      else if (row.action.includes('stage')) action = 'memperbarui tahap layanan';
+      else if (row.action.includes('completed')) action = 'menyelesaikan layanan';
+
+      const isIssue = row.action.includes('issue');
+      const isCompleted = row.action.includes('completed');
+
+      return {
+        id: row.id,
+        serviceId: row.service_id,
+        actor: actor?.full_name?.trim() || 'Pengguna',
+        action,
+        description: service
+          ? `${service.service_number} · ${service.client_name}`
+          : 'Informasi layanan tidak tersedia',
+        time: formatRelativeTime(new Date(row.created_at)),
+        type: isIssue ? 'issue' : isCompleted ? 'completed' : 'update',
+      };
+    });
+
+    setActivities(mapped);
+  }, [isNotaris]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!isNotaris) return;
-
-      let isActive = true;
-
-      const loadRecentActivities = async () => {
-        const { data, error } = await supabase
-          .from('service_activity_logs')
-          .select(`
-            id, service_id, action, details, created_at,
-            actor:profiles!service_activity_logs_actor_id_fkey(full_name),
-            service:services!service_activity_logs_service_id_fkey(service_number, client_name)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (!isActive) return;
-        if (error) {
-          setActivities([]);
-          setActivitiesLoadFailed(true);
-          return;
-        }
-
-        setActivitiesLoadFailed(false);
-
-        const relativeTime = (value: string) => {
-          const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
-          if (elapsedMinutes < 1) return 'Baru saja';
-          if (elapsedMinutes < 60) return `${elapsedMinutes} menit lalu`;
-          const hours = Math.floor(elapsedMinutes / 60);
-          if (hours < 24) return `${hours} jam lalu`;
-          const days = Math.floor(hours / 24);
-          return `${days} hari lalu`;
-        };
-
-        const mapped = (data ?? []).map((row): ActivityItem => {
-          const actorValue = row.actor as unknown as { full_name: string | null } | { full_name: string | null }[] | null;
-          const actor = Array.isArray(actorValue) ? actorValue[0] : actorValue;
-          const serviceValue = row.service as unknown as { service_number: string; client_name: string } | { service_number: string; client_name: string }[] | null;
-          const service = Array.isArray(serviceValue) ? serviceValue[0] : serviceValue;
-          const details = row.details as { member_role?: string } | null;
-
-          let action = 'melakukan pembaruan pada layanan';
-          if (row.action === 'service_created') action = 'membuat layanan';
-          else if (row.action === 'service_member_added') {
-            action = details?.member_role === 'support'
-              ? 'menambahkan staf pendukung pada layanan'
-              : 'menetapkan penanggung jawab layanan';
-          } else if (row.action.includes('issue')) action = 'mencatat kendala pada layanan';
-          else if (row.action.includes('stage')) action = 'memperbarui tahap layanan';
-          else if (row.action.includes('completed')) action = 'menyelesaikan layanan';
-
-          const isIssue = row.action.includes('issue');
-          const isCompleted = row.action.includes('completed');
-
-          return {
-            id: row.id,
-            serviceId: row.service_id,
-            actor: actor?.full_name?.trim() || 'Pengguna',
-            action,
-            description: service
-              ? `${service.service_number} · ${service.client_name}`
-              : 'Informasi layanan tidak tersedia',
-            time: relativeTime(row.created_at),
-            type: isIssue ? 'issue' : isCompleted ? 'completed' : 'update',
-          };
-        });
-
-        setActivities(mapped);
-      };
-
-      void loadRecentActivities();
-      return () => {
-        isActive = false;
-      };
-    }, [isNotaris]),
+      if (isNotaris) {
+        void loadRecentActivities();
+      }
+    }, [isNotaris, loadRecentActivities]),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refreshServices(),
+      refreshNotifications(),
+      loadRecentActivities(),
+    ]);
+    setRefreshing(false);
+  }, [refreshServices, refreshNotifications, loadRecentActivities]);
   if (!account) return null;
 
   // Staf memiliki dashboard tersendiri (tugas saya), bukan ringkasan kantor.
@@ -154,7 +151,11 @@ export function HomeScreen({
 
   return (
     <View style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing || servicesLoading} onRefresh={onRefresh} />}
+      >
         <HomeHeader
           dateLabel={dateLabel}
           greeting={`Selamat pagi, ${account.name.split(' ')[0]}`}

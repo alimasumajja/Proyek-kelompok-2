@@ -1,10 +1,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { notificationPrefsData } from "@/data/dummy";
 import { supabase } from "@/lib/supabase";
 import type { NotificationPrefs, UserAccount } from "@/types/profile";
 import { getInitials } from "@/utils/service";
+
+const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  deadlineNear: true,
+  newIssue: true,
+  noUpdate: true,
+};
 
 export interface NewStaff {
   name: string;
@@ -136,7 +141,7 @@ export function ProfileStoreProvider({ children }: { children: React.ReactNode }
 
   const notificationPrefs = useMemo<NotificationPrefs>(() => {
     const mine = rows.find((r) => r.id === userId)?.notification_prefs;
-    return { ...notificationPrefsData, ...(mine ?? {}) };
+    return { ...DEFAULT_NOTIFICATION_PREFS, ...(mine ?? {}) };
   }, [rows, userId]);
 
   const isUsernameTaken = useCallback((username: string) => accounts.some((a) => a.username.toLowerCase() === normalize(username)), [accounts]);

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { staffDirectory } from '@/data/dummy';
 import type { ServiceItem, StaffRef } from '@/types/service';
 import { displayDateToInput, parseInputDate } from '@/utils/date';
 import { Button } from '../atoms';
@@ -36,7 +35,7 @@ function AssignmentForm({ service, staffList, onSave }: Pick<AssignmentSheetProp
 
   const availableStaffNames = staffList && staffList.length > 0
     ? staffList.map((s) => s.name)
-    : staffDirectory;
+    : [service.assignedStaff.name];
 
   const submit = () => {
     const dueDate = parseInputDate(dateText);
