@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -23,6 +24,7 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { login, user, loading } = useAuth();
+  const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
     if (!loading && user) router.replace('/(tabs)');
@@ -55,100 +57,115 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoLetter}>N</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}>
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoBox}>
+              <Text style={styles.logoLetter}>N</Text>
+            </View>
+            <Text style={styles.logoText}>
+              Notaris<Text style={styles.logoTextBold}>AI</Text>
+            </Text>
           </View>
-          <Text style={styles.logoText}>
-            Notaris<Text style={styles.logoTextBold}>AI</Text>
-          </Text>
+
+          <View style={styles.badge}>
+            <Feather name="lock" size={12} color="#D4AF37" />
+            <Text style={styles.badgeText}>Akses aman kantor</Text>
+          </View>
+          <Text style={styles.welcomeTitle}>Selamat Datang</Text>
+          <Text style={styles.welcomeSubtitle}>Masuk untuk memantau layanan kantor Anda.</Text>
         </View>
 
-        <View style={styles.badge}>
-          <Feather name="lock" size={12} color="#D4AF37" />
-          <Text style={styles.badgeText}>Akses aman kantor</Text>
-        </View>
-        <Text style={styles.welcomeTitle}>Selamat Datang</Text>
-        <Text style={styles.welcomeSubtitle}>Masuk untuk memantau layanan kantor Anda.</Text>
-      </View>
+        <View style={styles.formContainer}>
+          {errorMessage ? (
+            <View style={styles.errorBanner}>
+              <Feather name="alert-circle" size={18} color="#D32F2F" style={{ marginTop: 2 }} />
+              <Text style={styles.errorBannerText}>{errorMessage}</Text>
+            </View>
+          ) : null}
 
-      <View style={styles.formContainer}>
-        {errorMessage ? (
-          <View style={styles.errorBanner}>
-            <Feather name="alert-circle" size={18} color="#D32F2F" style={{ marginTop: 2 }} />
-            <Text style={styles.errorBannerText}>{errorMessage}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email</Text>
-          <View style={styles.inputWrapper}>
-            <Feather name="user" size={20} color="#7a7a7a" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Masukkan email"
-              value={email}
-              onChangeText={(t) => {
-                setEmail(t);
-                if (errorMessage) setErrorMessage(null);
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!submitting}
-              returnKeyType="next"
-            />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Kata sandi</Text>
-          <View style={styles.inputWrapper}>
-            <Feather name="lock" size={20} color="#7a7a7a" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Masukkan kata sandi"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              editable={!submitting}
-              onSubmitEditing={handleLogin}
-              returnKeyType="done"
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword((current) => !current)}
-              disabled={submitting}
-              accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}>
-              <Feather
-                name={showPassword ? 'eye' : 'eye-off'}
-                size={20}
-                color="#7a7a7a"
-                style={styles.inputIconRight}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <View style={styles.inputWrapper}>
+              <Feather name="user" size={20} color="#7a7a7a" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan email"
+                value={email}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  if (errorMessage) setErrorMessage(null);
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                editable={!submitting}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
               />
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        <TouchableOpacity
-          style={[styles.loginButton, submitting && styles.loginButtonDisabled]}
-          onPress={handleLogin}
-          disabled={submitting}>
-          {submitting ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.loginButtonText}>Masuk</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Kata sandi</Text>
+            <View style={styles.inputWrapper}>
+              <Feather name="lock" size={20} color="#7a7a7a" style={styles.inputIcon} />
+              <TextInput
+                ref={passwordRef}
+                style={styles.input}
+                placeholder="Masukkan kata sandi"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                editable={!submitting}
+                onSubmitEditing={handleLogin}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword((current) => !current)}
+                disabled={submitting}
+                accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}>
+                <Feather
+                  name={showPassword ? 'eye' : 'eye-off'}
+                  size={20}
+                  color="#7a7a7a"
+                  style={styles.inputIconRight}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.loginButton, submitting && styles.loginButtonDisabled]}
+            onPress={handleLogin}
+            disabled={submitting}>
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Masuk</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
+  scrollContent: { flexGrow: 1 },
   header: {
     backgroundColor: '#17352D',
     paddingTop: 80,
