@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { notificationsData } from "@/data/dummy";
 import { SERVICE_STAGES } from "@/constants/service";
 import type {
   ActionResult,
   ServiceType,
   NotificationItem,
+  NotificationTone,
   ServiceActivity,
   ServiceItem,
   ServiceNote,
@@ -20,12 +20,24 @@ import {
   calculateDurationDays,
   formatDateId,
   formatDateTimeId,
+  formatRelativeTime,
   formatTimeShort,
   parseDisplayDate,
 } from "@/utils/date";
 import { progressForStage } from "@/utils/service-workflow";
 import { NO_DUE_DATE } from "@/utils/service";
 import { normalizeServiceTypeName, validateServiceTypeName } from "@/utils/service-types";
+
+function inferNotificationTone(title: string, body: string): NotificationTone {
+  const text = `${title} ${body}`.toLowerCase();
+  if (text.includes("terlewati") || text.includes("batal") || text.includes("terlambat")) {
+    return "danger";
+  }
+  if (text.includes("kendala") || text.includes("tunda") || text.includes("warning")) {
+    return "warning";
+  }
+  return "info";
+}
 
 type NewActivity = Pick<ServiceActivity, "title" | "text" | "tone">;
 
@@ -58,6 +70,9 @@ interface ServiceStoreValue {
   serviceDetailsLoading: Record<string, boolean>;
   fetchServiceDetails: (serviceId: string) => Promise<void>;
   notifications: NotificationItem[];
+  notificationsLoading: boolean;
+  notificationsError: string | null;
+  refreshNotifications: () => Promise<void>;
   unreadCount: number;
   role: UserRole;
   /** Nama pelaku aksi pada riwayat, mengikuti peran demo. */
@@ -104,7 +119,8 @@ interface ServiceStoreValue {
     note: { category: NoteCategory; text: string }
   ) => Promise<ActionResult>;
   addActivity: (serviceId: string, activity: NewActivity) => void;
-  markAllNotificationsRead: () => void;
+  markAllNotificationsRead: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
   /** Menambah notifikasi baru (tampil paling atas, belum dibaca). */
   addNotification: (n: Omit<NotificationItem, "id" | "time" | "read">) => void;
 }
@@ -135,7 +151,9 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
   const [activities, setActivities] = useState<Record<string, ServiceActivity[]>>({});
   const [serviceTiming, setServiceTiming] = useState<Record<string, StageTiming>>({});
   const [serviceDetailsLoading, setServiceDetailsLoading] = useState<Record<string, boolean>>({});
-  const [notifications, setNotifications] = useState(notificationsData);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole>("Notaris");
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [serviceTypesLoading, setServiceTypesLoading] = useState(true);
@@ -305,6 +323,95 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
     setStaffLoading(false);
   }, []);
 
+  const refreshNotifications = useCallback(async (): Promise<void> => {
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, service_id, title, body, is_read, created_at")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setNotificationsError(error.message);
+        return;
+      }
+
+      const mapped: NotificationItem[] = (data ?? []).map((row) => {
+        const created = new Date(row.created_at);
+        return {
+          id: row.id,
+          serviceId: row.service_id ?? undefined,
+          title: row.title,
+          text: row.body,
+          time: formatRelativeTime(created),
+          tone: inferNotificationTone(row.title, row.body),
+          read: row.is_read,
+        };
+      });
+
+      setNotifications(mapped);
+    } catch (err) {
+      setNotificationsError(err instanceof Error ? err.message : "Gagal memuat notifikasi.");
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
+  // Langganan Realtime untuk pembaruan notifikasi otomatis dari backend
+  useEffect(() => {
+    const channel = supabase
+      .channel("realtime-notifications-channel")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const newRow = payload.new as {
+              id: string;
+              service_id: string | null;
+              title: string;
+              body: string;
+              is_read: boolean;
+              created_at: string;
+            };
+            const created = new Date(newRow.created_at);
+            const item: NotificationItem = {
+              id: newRow.id,
+              serviceId: newRow.service_id ?? undefined,
+              title: newRow.title,
+              text: newRow.body,
+              time: formatRelativeTime(created),
+              tone: inferNotificationTone(newRow.title, newRow.body),
+              read: newRow.is_read,
+            };
+            setNotifications((prev) => [item, ...prev.filter((n) => n.id !== item.id)]);
+          } else if (payload.eventType === "UPDATE") {
+            const updatedRow = payload.new as {
+              id: string;
+              is_read: boolean;
+            };
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === updatedRow.id ? { ...n, read: updatedRow.is_read } : n))
+            );
+          } else if (payload.eventType === "DELETE") {
+            const oldRow = payload.old as { id: string };
+            setNotifications((prev) => prev.filter((n) => n.id !== oldRow.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     const {
       data: { subscription },
@@ -319,6 +426,9 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
         setActiveStaff([]);
         setStaffError(null);
         setStaffLoading(false);
+        setNotifications([]);
+        setNotificationsLoading(false);
+        setNotificationsError(null);
         return;
       }
 
@@ -327,6 +437,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
           void refreshActiveStaff();
           void refreshServices();
           void refreshServiceTypes();
+          void refreshNotifications();
         }, 0);
       }
     });
@@ -334,7 +445,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
     return () => {
       subscription.unsubscribe();
     };
-  }, [refreshServiceTypes, refreshServices, refreshActiveStaff]);
+  }, [refreshServiceTypes, refreshServices, refreshActiveStaff, refreshNotifications]);
 
   const getService = useCallback((id: string) => services.find((s) => s.id === id), [services]);
 
@@ -815,7 +926,23 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
     setNotifications((prev) => [{ id: nextId("NT"), time: "Baru saja", read: false, ...n }, ...prev]);
   }, []);
 
-  const markAllNotificationsRead = useCallback(() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))), []);
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await supabase.from("notifications").update({ is_read: true }).eq("is_read", false);
+    } catch (err) {
+      console.error("Gagal menandai semua notifikasi dibaca:", err);
+    }
+  }, []);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    } catch (err) {
+      console.error("Gagal menandai notifikasi dibaca:", err);
+    }
+  }, []);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
@@ -835,6 +962,9 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       serviceDetailsLoading,
       fetchServiceDetails,
       notifications,
+      notificationsLoading,
+      notificationsError,
+      refreshNotifications,
       unreadCount,
       role,
       actorName: ACTOR_BY_ROLE[role],
@@ -848,6 +978,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       addNote,
       addActivity,
       markAllNotificationsRead,
+      markNotificationRead,
       addNotification,
       serviceTypes,
       serviceTypesLoading,
@@ -874,6 +1005,9 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       serviceDetailsLoading,
       fetchServiceDetails,
       notifications,
+      notificationsLoading,
+      notificationsError,
+      refreshNotifications,
       unreadCount,
       role,
       getService,
@@ -885,6 +1019,7 @@ export function ServiceStoreProvider({ children }: { children: React.ReactNode }
       addNote,
       addActivity,
       markAllNotificationsRead,
+      markNotificationRead,
       addNotification,
       serviceTypes,
       serviceTypesLoading,

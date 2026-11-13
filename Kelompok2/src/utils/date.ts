@@ -63,3 +63,20 @@ export function calculateDurationDays(from: Date, to: Date = new Date()): string
   if (days === 0) return '< 1 hari';
   return `${days} hari`;
 }
+
+/** Format waktu relatif ramah: "Baru saja", "10 menit lalu", "Kemarin", dll. */
+export function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return 'Baru saja';
+  if (diffMin < 60) return `${diffMin} menit lalu`;
+  if (diffHour < 24) return `${diffHour} jam lalu`;
+  if (diffDay === 1) return 'Kemarin';
+  if (diffDay < 7) return `${diffDay} hari lalu`;
+  return formatDateId(date);
+}

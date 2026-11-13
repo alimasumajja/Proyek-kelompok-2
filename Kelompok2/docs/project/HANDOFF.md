@@ -16,11 +16,15 @@
   - Penambahan catatan progres & kendala (`service_notes`) dengan mapping kategori database.
   - Perhitungan durasi tahap dan durasi total berbasis riwayat riil (`service_stage_history`).
   - Pemilihan penanggung jawab dari daftar staf aktif database (`profiles`).
+- Implementasi **Notifikasi Real‑time** (`supabase.channel` & `postgres_changes`):
+  - Integrasi tabel `notifications` riil di Supabase (query tersaring RLS otomatis `recipient_id = auth.uid()`).
+  - Langganan Realtime Postgres Changes (`INSERT`, `UPDATE`, `DELETE`) untuk pembaruan instan tanpa reload.
+  - Fitur tandai dibaca (`markAllNotificationsRead` & `markNotificationRead`) terhubung langsung ke database.
 - Verifikasi kompilasi TypeScript (`tsc --noEmit`) dan ESLint 100% lolos tanpa error.
 
 ## Fokus Selanjutnya (Prioritas 2)
 1. ~~Integrasi layanan **Service Detail** dengan Supabase RPCs.~~ (Selesai)
-2. Implementasi notifikasi real‑time (Supabase Realtime pada `notifications`).
+2. ~~Implementasi notifikasi real‑time (Supabase Realtime pada `notifications`).~~ (Selesai)
 3. Penyempurnaan layar Beranda, Layanan, dan Repertorium untuk menampilkan data nyata (menggantikan sisa data dummy).
 
 ## Risiko & Isu Terbuka
