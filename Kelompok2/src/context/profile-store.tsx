@@ -147,13 +147,22 @@ export function ProfileStoreProvider({ children }: { children: React.ReactNode }
   const isUsernameTaken = useCallback((username: string) => accounts.some((a) => a.username.toLowerCase() === normalize(username)), [accounts]);
 
   const updateStaff = useCallback(
-    async (id: string, changes: { name: string }) => {
+    async (id: string, changes: { name: string; email?: string }) => {
       const trimmedName = changes.name.trim();
       if (!trimmedName) throw new Error("Nama staf wajib diisi.");
 
+      const body: Record<string, unknown> = {
+        action: "update",
+        staffId: id,
+        fullName: trimmedName,
+      };
+      if (changes.email && changes.email.trim()) {
+        body.email = changes.email.trim().toLowerCase();
+      }
+
       // Perubahan profil staf harus dilakukan server-side; klien tidak diberi hak UPDATE profiles.
       const { error } = await supabase.functions.invoke("manage-staff", {
-        body: { action: "update", staffId: id, fullName: trimmedName },
+        body,
       });
       if (error) throw new Error(await pesanGalat(error));
 

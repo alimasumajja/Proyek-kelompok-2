@@ -40,7 +40,9 @@ export const supabase = createClient(
       storage: Platform.OS === 'web' ? webStorage : AsyncStorage,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      // Web: baca token dari URL hash setelah redirect OAuth.
+      // Mobile: false agar tidak bentrok dengan deep-link handler native.
+      detectSessionInUrl: Platform.OS === 'web',
     },
   }
 );

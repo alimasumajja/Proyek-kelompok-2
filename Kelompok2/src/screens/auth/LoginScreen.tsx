@@ -22,8 +22,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { login, user, loading } = useAuth();
+  const { login, loginWithGoogle, user, loading } = useAuth();
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
@@ -53,6 +54,28 @@ export default function LoginScreen() {
       setSubmitting(false);
     }
   };
+
+  const handleGoogleLogin = async () => {
+    setErrorMessage(null);
+    setGoogleLoading(true);
+    try {
+      const user = await loginWithGoogle();
+      Alert.alert('Login Berhasil', `Selamat datang, ${user.name}!`);
+      router.replace('/(tabs)');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Login dengan Google gagal.';
+      // Jika user membatalkan (menutup browser), tidak perlu tampilkan alert
+      if (!message.includes('dibatalkan')) {
+        setErrorMessage(message);
+        Alert.alert('Login Google Gagal', message);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const isDisabled = submitting || googleLoading;
 
   return (
     <KeyboardAvoidingView
@@ -107,7 +130,7 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 autoComplete="email"
                 textContentType="emailAddress"
-                editable={!submitting}
+                editable={!isDisabled}
                 returnKeyType="next"
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 blurOnSubmit={false}
@@ -129,13 +152,13 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 autoComplete="password"
                 textContentType="password"
-                editable={!submitting}
+                editable={!isDisabled}
                 onSubmitEditing={handleLogin}
                 returnKeyType="done"
               />
               <TouchableOpacity
                 onPress={() => setShowPassword((current) => !current)}
-                disabled={submitting}
+                disabled={isDisabled}
                 accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}>
                 <Feather
                   name={showPassword ? 'eye' : 'eye-off'}
@@ -148,18 +171,50 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.loginButton, submitting && styles.loginButtonDisabled]}
+            style={[styles.loginButton, isDisabled && styles.loginButtonDisabled]}
             onPress={handleLogin}
-            disabled={submitting}>
+            disabled={isDisabled}>
             {submitting ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.loginButtonText}>Masuk</Text>
             )}
           </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>atau</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Tombol Masuk dengan Google */}
+          <TouchableOpacity
+            style={[styles.googleButton, isDisabled && styles.loginButtonDisabled]}
+            onPress={handleGoogleLogin}
+            disabled={isDisabled}
+            accessibilityLabel="Masuk dengan Google">
+            {googleLoading ? (
+              <ActivityIndicator color="#17352D" />
+            ) : (
+              <>
+                <GoogleIcon />
+                <Text style={styles.googleButtonText}>Masuk dengan Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** Ikon Google sederhana menggunakan teks berwarna */
+function GoogleIcon() {
+  return (
+    <View style={styles.googleIconContainer}>
+      <Text style={styles.googleIconText}>G</Text>
+    </View>
   );
 }
 
@@ -249,4 +304,42 @@ const styles = StyleSheet.create({
   },
   loginButtonDisabled: { opacity: 0.7 },
   loginButtonText: { color: '#ffffff', fontSize: 17, fontWeight: '600' },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+    gap: 12,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
+  dividerText: { color: '#9CA3AF', fontSize: 13 },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 9999,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#ffffff',
+    gap: 10,
+  },
+  googleIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleIconText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4285F4',
+  },
+  googleButtonText: {
+    color: '#1d1d1f',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

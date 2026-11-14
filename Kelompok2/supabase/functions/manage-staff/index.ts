@@ -13,6 +13,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PREF_KEYS = ['deadlineNear', 'newIssue', 'noUpdate'] as const;
 
 function parsePrefs(value: unknown): Record<(typeof PREF_KEYS)[number], boolean> | null {
@@ -141,6 +142,50 @@ Deno.serve(async (req: Request) => {
       console.error('Gagal memperbarui nama staf:', rpcError.message);
       return json({ error: rpcError.message || 'Gagal memperbarui data staf' }, 400);
     }
+
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    if (email) {
+      if (!EMAIL_PATTERN.test(email)) {
+        return json({ error: 'Format email tidak valid' }, 400);
+      }
+      const { data: existingUser } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .neq('id', staffId)
+        .maybeSingle();
+
+      if (existingUser) {
+        return json({ error: 'Email sudah digunakan oleh akun lain' }, 400);
+      }
+
+      // Update auth.users email
+      const { error: authUpdateErr } = await admin.auth.admin.updateUserById(staffId, {
+        email,
+        email_confirm: true,
+      });
+      if (authUpdateErr) {
+        console.error('Gagal memperbarui email di auth.users:', authUpdateErr.message);
+        return json({ error: authUpdateErr.message || 'Gagal memperbarui email autentikasi' }, 400);
+      }
+
+      // Update profiles email
+      const { error: profUpdateErr } = await admin
+        .from('profiles')
+        .update({ email })
+        .eq('id', staffId);
+      if (profUpdateErr) {
+        console.error('Gagal memperbarui email di profiles:', profUpdateErr.message);
+        return json({ error: 'Gagal memperbarui email profil' }, 500);
+      }
+
+      // Bersihkan identitas auth pihak ketiga lama agar tidak bisa dipakai login lagi
+      await admin.rpc('cleanup_old_staff_identities', {
+        p_user_id: staffId,
+        p_new_email: email,
+      });
+    }
+
     return json({ ok: true });
   }
 

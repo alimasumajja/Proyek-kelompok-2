@@ -1,11 +1,25 @@
 # HANDOFF – NotarisAI Documentation Snapshot
 
-**Tanggal update:** 2026-11-13
+**Tanggal update:** 2026-11-14
 
 ## Ringkasan Proyek
-- **Frontend:** Implementasi UI selesai untuk Beranda, Layanan, Notifikasi, Profil, dan Repertorium. UI masih menggunakan data dummy; integrasi Supabase belum selesai.
-- **Backend:** Supabase project **Notaris** (ID `krzyuwzyuzlmvsgdfzij`) aktif. Edge Functions `create-staff` dan `manage-staff` telah dideploy dan berfungsi. RPCs untuk staff management (`manage_staff_profile`, `record_staff_created`) ada. RLS policies telah didefinisikan tetapi belum diverifikasi sepenuhnya.
-- **Database:** Migrasi lokal berjumlah 4 file; remote DB memiliki tambahan migrasi `20261110224714_use_invoker_for_profile_audit_rpcs.sql` yang kini telah dibuat secara lokal.
+- **Frontend:** Implementasi UI selesai untuk Beranda, Layanan, Notifikasi, Profil, Repertorium, dan Autentikasi. Mendukung dual login: Email/Kata Sandi dan Google OAuth (Web + persiapan Mobile standalone).
+- **Backend:** Supabase project **Notaris** (ID `krzyuwzyuzlmvsgdfzij`) aktif. Edge Functions `create-staff` dan `manage-staff` telah dideploy. RPCs untuk staff management (`manage_staff_profile`, `record_staff_created`, `cleanup_old_staff_identities`) terpasang.
+- **Database:** Migrasi lokal `20261114000100_fix_coalesce_ambiguity_in_manage_staff_profile.sql` telah diaplikasikan ke remote DB (memperbaiki ambiguitas tipe data coalesce).
+
+## Pekerjaan Terbaru (2026-11-14)
+- **Implementasi Google OAuth & Keamanan Akun Whitelist**:
+  - Validasi ketat di `AuthContext.tsx`: Hanya email yang sudah didaftarkan Notaris pada tabel `profiles` yang diizinkan masuk. Akun Google luar langsung ditolak (`signOut` otomatis + pesan penolakan).
+  - Alur Web OAuth: Menggunakan direct browser redirect (`window.location.href`) dan `detectSessionInUrl: Platform.OS === 'web'` di `supabase.ts`. Login Google di web (`localhost:8081`) berhasil masuk ke dashboard tanpa looping.
+  - Perbaikan Perubahan Email Staf oleh Notaris:
+    - `StaffManagementScreen.tsx` dan `profile-store.tsx` menyertakan `email` baru ke Edge Function `manage-staff`.
+    - Edge Function `manage-staff` memperbarui email di `auth.users` dan `profiles`, sekaligus memanggil RPC `cleanup_old_staff_identities` untuk menghapus data identitas OAuth lama sehingga email lama tidak dapat lagi dipakai untuk login.
+    - RPC `manage_staff_profile` diperbaiki dari error ambiguitas `pg_catalog.coalesce(text, text)`.
+- **Status Google OAuth di Mobile (Expo Go vs Standalone APK)**:
+  - Di Web: Berhasil 100%.
+  - Di Expo Go (Android): Terkendala batasan resmi Expo Go SDK 48–58 di mana browser Android (Samsung Browser / Chrome) memblokir HTTP 302 redirect ke custom scheme `exp://` (`ERR_UNKNOWN_URL_SCHEME`).
+  - Untuk Standalone APK (Production): Skema `kelompok2://auth/callback` sudah disiapkan dan akan bekerja via deep link native (`AndroidManifest.xml`).
+  - Untuk pengujian di Expo Go saat ini: Gunakan autentikasi Email & Kata Sandi, atau buka web via mobile browser di `http://<IP_KOMPUTER>:8081`.
 
 ## Pekerjaan Terbaru
 - Deploy Edge Functions untuk manajemen staf (`create-staff`, `manage-staff`).
@@ -27,12 +41,19 @@
   - Repertorium & Laporan (`laporan-store.ts`, `RepertoriumScreen.tsx`): Pemuatan otomatis data akta dan dokumen langsung saat layar dibuka bila belum termuat, sinkronisasi tabel `akta` riil.
   - Pembersihan dummy imports: `AssignmentSheet` dan `profile-store` dibersihkan dari ketergantungan `data/dummy`.
 - Verifikasi kompilasi TypeScript (`tsc --noEmit`), ESLint, dan bundling Android (`expo export --platform android`) 100% lolos tanpa error.
+- **Perbaikan Keyboard UX (Commit `7516f04`)**:
+  - Kolom email login (`LoginScreen.tsx`): Menambahkan `keyboardType="email-address"`, auto-complete, dan integrasi tombol Next keyboard ke kata sandi via ref.
+  - Penanganan form tertutup keyboard: Menambahkan pembungkus `ScrollView` (`flexGrow: 1`) pada `LoginScreen.tsx` dan memperbarui `KeyboardAvoidingView` menjadi `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}` pada `LoginScreen.tsx` dan `BottomSheet.tsx`. Seluruh form modal/lembar catatan kini tidak lagi tertutup keyboard saat mengetik di Android dan iOS.
 
 ## Fokus Selanjutnya (Prioritas Berikutnya)
 1. ~~Integrasi layanan **Service Detail** dengan Supabase RPCs.~~ (Selesai)
 2. ~~Implementasi notifikasi real‑time (Supabase Realtime pada `notifications`).~~ (Selesai)
 3. ~~Penyempurnaan layar Beranda, Layanan, dan Repertorium untuk menampilkan data nyata.~~ (Selesai)
-4. Pengujian sinkronisasi sesi login dan hak akses (Notaris vs Staf) end-to-end.
+4. ~~Perbaikan UX Keyboard pada Form Login dan Lembar Catatan.~~ (Selesai)
+5. **Implementasi Google OAuth (Sign in with Google)**:
+   - Menggunakan pendekatan *Pre-Registered Email Whitelist* (hanya akun Google yang sudah didaftarkan Notaris yang dapat login).
+   - Dokumen teknis: `docs/project/Rencana-Implementasi-Google-OAuth.md`.
+6. Pengujian sinkronisasi sesi login dan hak akses (Notaris vs Staf) end-to-end.
 
 ## Risiko & Isu Terbuka
 - UI masih mengandalkan data dummy, sehingga fungsionalitas tidak dapat diuji end‑to‑end.
