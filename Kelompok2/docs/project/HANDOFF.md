@@ -1,6 +1,57 @@
 # HANDOFF – NotarisAI Documentation Snapshot
 
-**Tanggal update:** 2026-11-14
+**Tanggal update:** 2026-11-15
+
+**Atribusi pekerjaan:** Implementasi Google OAuth, integrasi login Google Android,
+dan revisi UX login dikerjakan oleh **Noval**. Kepemilikan awal modul Login/Splash
+dan `AuthContext` oleh Ali tidak berarti implementasi OAuth dikerjakan oleh Ali.
+
+## Revisi UX login Android (2026-11-15)
+
+- Pengguna mengonfirmasi APK development berhasil login Google di HP.
+- Placeholder login memiliki warna eksplisit dan label aksesibilitas; tinggi input
+  dapat mengikuti ukuran teks. Tombol tampilkan kata sandi memiliki area sentuh 44dp.
+- Ikon huruf G diganti aset resmi Google yang disimpan lokal; sumber dicatat dalam
+  `assets/images/google-signin-source.txt`.
+- `auth-errors.ts` memetakan kode Supabase dan penolakan profil ke pesan Indonesia
+  dengan tindakan pemulihan. Kode `user_banned` dipertahankan dari callback;
+  pesan mentah server tidak ditampilkan. Penolakan umum tidak dianggap pembatalan.
+- Error ditampilkan pada form atau layar callback tanpa pop-up ganda. Login sukses
+  langsung membuka Beranda. Google memakai `prompt=select_account` agar mudah berganti akun.
+- Revisi OAuth dan UX login oleh Noval menyentuh modul autentikasi dan atom tampilan bersama. Tidak ada perubahan
+  schema, kebijakan akses, data produksi, atau dependency native.
+- Revisi dapat dimuat lewat Metro pada APK development yang sudah terpasang.
+  Pengguna mengonfirmasi login dan tampilan revisi sudah baik di HP pada 2026-11-15.
+  Pratinjau browser otomatis tidak terverifikasi karena timeout.
+- Verifikasi: TypeScript lulus, Expo lint lulus, 10 tes callback/pesan error lulus,
+  Android export lulus (1727 modul; aset Google 1x/2x/3x tercakup).
+  Kendala memori Windows diatasi dengan pemeriksaan berurutan, batas heap lebih kecil,
+  dan `expo export --platform android --max-workers 1`.
+
+## Persiapan development build Android (2026-11-14)
+
+- Branch kerja: `fix/android-google-oauth`, berasal dari `noval`.
+  Pembaruan disimpan ke branch `noval` atas permintaan pengguna.
+- Callback native menggunakan `kelompok2://auth/callback`, tanpa bergantung pada hostUri Metro.
+- Route `/auth/callback` menangani hasil login dan menggunakan validasi profil yang sama.
+- URL callback yang sama diproses sekali, walaupun diterima browser dan route bersamaan.
+- Log hasil browser lengkap dihapus agar token callback tidak dicetak.
+- Konfigurasi build dan langkah akun Expo, environment publik, serta redirect Supabase:
+  [Development-Build-Android.md](./Development-Build-Android.md).
+- APK development Android berhasil dibuat dan diunggah pada 2026-11-14:
+  [Build EAS 8b21a43b](https://expo.dev/accounts/novaladriann/projects/Kelompok2/builds/8b21a43b-1da0-4c93-a895-8149ca1d7363).
+  Tautan unduhan ada pada panduan development build. Pengguna mengonfirmasi login Google
+  dan tampilan revisi berhasil di HP pada 2026-11-15.
+- Pengarsipan Git EAS gagal pada clone lokal; upload berhasil dengan `EAS_NO_VCS=1`
+  dan `EAS_PROJECT_ROOT` menunjuk folder `Kelompok2`, tetap mengikuti `.gitignore`.
+- Implementasi OAuth dan konfigurasi development build Android dikerjakan oleh Noval.
+- Verifikasi setelah perubahan: TypeScript, Expo lint, 6 tes callback, dan Expo Android
+  export lulus. Introspeksi konfigurasi Android mengonfirmasi intent scheme `kelompok2`.
+- Sesi EAS CLI sudah terverifikasi sebagai `novaladriann` pada pemeriksaan lanjutan.
+- Redirect Supabase terverifikasi lewat simulasi pembatalan OAuth (tanpa login Google):
+  endpoint callback menghasilkan HTTP 302 menuju `kelompok2://auth/callback`.
+  Callback provider Google tetap `https://krzyuwzyuzlmvsgdfzij.supabase.co/auth/v1/callback`.
+  Tidak ada perubahan konfigurasi Auth atau data database pada pemeriksaan ini.
 
 ## Ringkasan Proyek
 - **Frontend:** Implementasi UI selesai untuk Beranda, Layanan, Notifikasi, Profil, Repertorium, dan Autentikasi. Mendukung dual login: Email/Kata Sandi dan Google OAuth (Web + persiapan Mobile standalone).
@@ -8,7 +59,7 @@
 - **Database:** Migrasi lokal `20261114000100_fix_coalesce_ambiguity_in_manage_staff_profile.sql` telah diaplikasikan ke remote DB (memperbaiki ambiguitas tipe data coalesce).
 
 ## Pekerjaan Terbaru (2026-11-14)
-- **Implementasi Google OAuth & Keamanan Akun Whitelist**:
+- **Implementasi Google OAuth & Keamanan Akun Whitelist (Noval)**:
   - Validasi ketat di `AuthContext.tsx`: Hanya email yang sudah didaftarkan Notaris pada tabel `profiles` yang diizinkan masuk. Akun Google luar langsung ditolak (`signOut` otomatis + pesan penolakan).
   - Alur Web OAuth: Menggunakan direct browser redirect (`window.location.href`) dan `detectSessionInUrl: Platform.OS === 'web'` di `supabase.ts`. Login Google di web (`localhost:8081`) berhasil masuk ke dashboard tanpa looping.
   - Perbaikan Perubahan Email Staf oleh Notaris:

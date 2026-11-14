@@ -4,10 +4,11 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Alert, AppState, Platform } from 'react-native';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
@@ -16,6 +17,8 @@ import type { UserAccount } from '@/types/profile';
 import type { UserRole } from '@/types/service';
 import { getInitials } from '@/utils/service';
 import { useServiceStore } from '@/context/service-store';
+import { NATIVE_OAUTH_REDIRECT, parseOAuthCallback } from '@/utils/oauth';
+import { AuthFlowError } from '@/utils/auth-errors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -24,6 +27,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<UserAccount>;
   loginWithGoogle: () => Promise<UserAccount>;
+  completeGoogleLogin: (url: string) => Promise<UserAccount>;
   logout: () => Promise<void>;
   checkActiveStatus: () => Promise<boolean>;
 }
@@ -79,7 +83,7 @@ async function fetchUserProfile(userId: string, email: string): Promise<UserAcco
   }
 
   if (error || !data) {
-    throw new Error('Akun Google ini belum didaftarkan oleh Notaris. Hubungi Notaris kantor Anda.');
+    throw new AuthFlowError('profile_not_registered');
   }
 
   const profile = data as ProfileRow & { email: string | null };
@@ -88,91 +92,18 @@ async function fetchUserProfile(userId: string, email: string): Promise<UserAcco
   // Mencegah akun Google lama yang sudah diganti oleh Notaris tetap bisa masuk.
   const registeredEmail = (profile.email ?? '').trim().toLowerCase();
   if (registeredEmail && normalizedEmail && registeredEmail !== normalizedEmail) {
-    throw new Error(
-      `Email login (${normalizedEmail}) tidak sesuai dengan email terdaftar kantor (${registeredEmail}). Hubungi Notaris.`
-    );
+    throw new AuthFlowError('profile_email_mismatch');
   }
 
   if (!profile.is_active) {
-    throw new Error(
-      'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-    );
+    throw new AuthFlowError('profile_inactive');
   }
 
   return mapProfile(profile, registeredEmail || email);
 }
 
-function extractParamsFromUrl(url: string): Record<string, string> {
-  const params: Record<string, string> = {};
-
-  const queryIndex = url.indexOf('?');
-  const hashIndex = url.indexOf('#');
-
-  let queryString = '';
-  let hashString = '';
-
-  if (queryIndex !== -1) {
-    queryString =
-      hashIndex !== -1 && hashIndex > queryIndex
-        ? url.substring(queryIndex + 1, hashIndex)
-        : url.substring(queryIndex + 1);
-  }
-
-  if (hashIndex !== -1) {
-    hashString = url.substring(hashIndex + 1);
-  }
-
-  const parsePairs = (str: string) => {
-    str.split('&').forEach((part) => {
-      const idx = part.indexOf('=');
-      if (idx !== -1) {
-        const k = decodeURIComponent(part.substring(0, idx));
-        const v = decodeURIComponent(part.substring(idx + 1));
-        if (k) params[k] = v;
-      }
-    });
-  };
-
-  if (queryString) parsePairs(queryString);
-  if (hashString) parsePairs(hashString);
-
-  return params;
-}
-
-function getOAuthRedirectUrl(): string {
-  if (Platform.OS === 'web') {
-    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081';
-  }
-
-  // Expo Go di perangkat fisik (development):
-  // Linking.createURL() di Expo Router dapat menghasilkan URL http:// yang tidak diintersep
-  // oleh aplikasi di Android, sehingga diarahkan ke browser dan memicu bad_oauth_state.
-  //
-  // Solusi: Bangun URL exp:// eksplisit dari hostUri Metro Bundler:
-  // Hasil: exp://<IP_KOMPUTER>:8081/--/auth/callback
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    (Constants as unknown as { expoGoConfig?: { debuggerHost?: string } }).expoGoConfig?.debuggerHost ||
-    (Constants as unknown as { manifest?: { debuggerHost?: string } }).manifest?.debuggerHost ||
-    (Constants as unknown as { manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } } })
-      .manifest2?.extra?.expoGo?.debuggerHost;
-
-  if (hostUri) {
-    return `exp://${hostUri}/--/auth/callback`;
-  }
-
-  if (Constants.linkingUri && Constants.linkingUri.startsWith('exp://')) {
-    const base = Constants.linkingUri.replace(/\/--($|\/.*$)/, '').replace(/\/$/, '');
-    return `${base}/--/auth/callback`;
-  }
-
-  // Standalone APK / Production Build:
-  // Skema 'kelompok2://' sudah terdaftar di AndroidManifest.xml.
-  return Linking.createURL('auth/callback');
-}
-
 async function createSessionFromUrl(url: string): Promise<Session | null> {
-  const params = extractParamsFromUrl(url);
+  const params = parseOAuthCallback(url);
 
   if (params.code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
@@ -200,8 +131,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setRole } = useServiceStore();
   const [user, setUser] = useState<UserAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const callbackAttempt = useRef<{ url: string; promise: Promise<UserAccount> } | null>(null);
 
   const logout = useCallback(async () => {
+    callbackAttempt.current = null;
     try {
       await supabase.auth.signOut();
     } catch {
@@ -284,7 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ) {
         // Tangani callback web OAuth: setelah detectSessionInUrl=true membaca token dari URL hash,
         // Supabase menembak SIGNED_IN → kita pulihkan sesi pengguna.
-        void restoreSession(session);
+        // Hindari permintaan Supabase bersarang di dalam lock event Auth.
+        setTimeout(() => { if (mounted) void restoreSession(session); }, 0);
       }
     });
 
@@ -349,17 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        const errorMsg = error.message.toLowerCase();
-        if (
-          errorMsg.includes('banned') ||
-          errorMsg.includes('disabled') ||
-          errorMsg.includes('inactive')
-        ) {
-          throw new Error(
-            'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-          );
-        }
-        throw new Error('Email atau kata sandi tidak sesuai.');
+        throw error;
       }
 
       if (!data.user?.email) {
@@ -380,6 +304,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [setRole]
   );
 
+  const completeGoogleLogin = useCallback((url: string): Promise<UserAccount> => {
+    // Browser dan route dapat menerima URL yang sama. Tukarkan kode hanya sekali.
+    if (callbackAttempt.current?.url === url) return callbackAttempt.current.promise;
+    const promise = (async () => {
+      try {
+        const session = await createSessionFromUrl(url);
+        if (!session?.user?.email) throw new Error('Gagal memproses sesi autentikasi Google.');
+        const profile = await fetchUserProfile(session.user.id, session.user.email);
+        setRole(profile.role);
+        setUser(profile);
+        return profile;
+      } catch (error) {
+        await supabase.auth.signOut().catch(() => {});
+        setUser(null);
+        throw error;
+      }
+    })();
+    callbackAttempt.current = { url, promise };
+    return promise;
+  }, [setRole]);
+
   const loginWithGoogle = useCallback(async (): Promise<UserAccount> => {
     // Pada platform Web: gunakan redirect browser langsung agar tidak terblokir popup blocker.
     if (Platform.OS === 'web') {
@@ -389,10 +334,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           redirectTo: webRedirect,
           skipBrowserRedirect: false,
+          queryParams: { prompt: 'select_account' },
         },
       });
       if (error) {
-        throw new Error(error.message || 'Gagal memulai autentikasi Google.');
+        throw error;
       }
       if (data?.url && typeof window !== 'undefined') {
         window.location.href = data.url;
@@ -401,8 +347,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return new Promise(() => {}) as Promise<UserAccount>;
     }
 
-    // Pada platform Mobile (Expo Go / Android / iOS):
-    const redirectUrl = getOAuthRedirectUrl();
+    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+      throw new AuthFlowError('expo_go_unsupported');
+    }
+    callbackAttempt.current = null;
+    // Development build juga memiliki hostUri Metro; callback tetap memakai scheme aplikasi.
+    const redirectUrl = NATIVE_OAUTH_REDIRECT;
     if (__DEV__) {
       console.log('[Google OAuth] Redirect URL target:', redirectUrl);
     }
@@ -412,11 +362,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: {
         redirectTo: redirectUrl,
         skipBrowserRedirect: true,
+        queryParams: { prompt: 'select_account' },
       },
     });
 
     if (error) {
-      throw new Error(error.message || 'Gagal memulai autentikasi Google.');
+      throw error;
     }
 
     if (!data?.url) {
@@ -428,37 +379,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (__DEV__) {
-      console.log('[Google OAuth] WebBrowser result:', result);
+      console.log('[Google OAuth] Status browser:', result.type);
     }
 
     if (result.type !== 'success' || !result.url) {
-      throw new Error('Proses login Google dibatalkan.');
+      throw new AuthFlowError('oauth_cancelled');
     }
 
-    const session = await createSessionFromUrl(result.url);
-    if (!session?.user?.email) {
-      throw new Error('Gagal memproses sesi autentikasi Google.');
-    }
-
-    try {
-      const profile = await fetchUserProfile(session.user.id, session.user.email);
-      setRole(profile.role);
-      setUser(profile);
-      return profile;
-    } catch (profileError) {
-      await supabase.auth.signOut().catch(() => {});
-      setUser(null);
-      throw profileError;
-    }
-  }, [setRole]);
+    return completeGoogleLogin(result.url);
+  }, [completeGoogleLogin]);
 
   useEffect(() => {
     if (user) setRole(user.role);
   }, [user, setRole]);
 
   const value = useMemo(
-    () => ({ user, loading, login, loginWithGoogle, logout, checkActiveStatus }),
-    [user, loading, login, loginWithGoogle, logout, checkActiveStatus]
+    () => ({ user, loading, login, loginWithGoogle, completeGoogleLogin, logout, checkActiveStatus }),
+    [user, loading, login, loginWithGoogle, completeGoogleLogin, logout, checkActiveStatus]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

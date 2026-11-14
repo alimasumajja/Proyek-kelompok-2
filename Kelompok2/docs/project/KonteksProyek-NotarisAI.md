@@ -45,8 +45,9 @@ NotarisAI membantu **satu kantor notaris** memantau pekerjaan hariannya: layanan
 - Akun demo: `nadia` / `notaris123` (Notaris), `andi` / `staf123`, `rina` / `staf123`, `dewi` (Nonaktif). Peran bisa diganti lewat Profil → Mode Demo.
 
 ## 6. Pembagian pekerjaan (berdasarkan riwayat Git)
-- **Noval:** Beranda dan Dashboard Staf, Layanan, Detail Layanan, Notifikasi, Jenis Layanan, bottom nav, `permissions`/`use-session`.
+- **Noval:** Beranda dan Dashboard Staf, Layanan, Detail Layanan, Notifikasi, Jenis Layanan, bottom nav, `permissions`/`use-session`; implementasi Google OAuth, integrasi login Google Android, development build, dan revisi UX login (konfirmasi 2026-11-15).
 - **Aji:** halaman Tambah Layanan. **Avis:** Profil dan Manajemen Staf. **Amam:** Laporan, Repertorium, Pratinjau/persetujuan/ekspor. **Ali:** Login/Splash, perapian struktur folder, `AuthContext`.
+- Pembagian Ali di atas merujuk modul autentikasi awal; pekerjaan Google OAuth dikerjakan oleh **Noval**, bukan Ali.
 - **Jangan mengubah berkas milik anggota lain tanpa menandainya** dan menyiapkan perubahan sebagai usulan terpisah untuk pemiliknya.
 
 ## 7. Cara bekerja yang diharapkan

@@ -1,5 +1,7 @@
 # Rencana Implementasi Google OAuth (NotarisAI)
 
+**Pelaksana implementasi:** Noval (dikonfirmasi 2026-11-15).
+
 Dokumen ini mendokumentasikan spesifikasi, arsitektur keamanan, dan rencana tahapan implementasi fitur **Google OAuth (Sign in with Google)** pada aplikasi NotarisAI.
 
 ---

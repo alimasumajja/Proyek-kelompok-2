@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useAuth } from '@/context/AuthContext';
+import { GoogleIcon } from '@/components/atoms/GoogleIcon';
+import { getAuthFeedback, type AuthFeedback } from '@/utils/auth-errors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -23,53 +24,52 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
   const { login, loginWithGoogle, user, loading } = useAuth();
   const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const emailRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+
+  const showFeedback = (value: AuthFeedback) => {
+    setFeedback(value);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   useEffect(() => {
     if (!loading && user) router.replace('/(tabs)');
   }, [loading, user]);
 
   const handleLogin = async () => {
-    setErrorMessage(null);
+    if (submitting || googleLoading) return;
+    setFeedback(null);
     if (!email.trim() || !password) {
-      const msg = 'Masukkan email dan kata sandi.';
-      setErrorMessage(msg);
-      Alert.alert('Data belum lengkap', msg);
+      showFeedback({ title: 'Lengkapi data masuk', message: 'Masukkan email dan kata sandi Anda.' });
+      if (!email.trim()) emailRef.current?.focus();
+      else passwordRef.current?.focus();
       return;
     }
 
     setSubmitting(true);
     try {
-      const user = await login(email, password);
-      Alert.alert('Login Berhasil', `Selamat datang, ${user.name}!`);
+      await login(email, password);
       router.replace('/(tabs)');
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Email atau kata sandi tidak sesuai.';
-      setErrorMessage(message);
-      Alert.alert('Login Gagal', message);
+      showFeedback(getAuthFeedback(error));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setErrorMessage(null);
+    if (submitting || googleLoading) return;
+    setFeedback(null);
     setGoogleLoading(true);
     try {
-      const user = await loginWithGoogle();
-      Alert.alert('Login Berhasil', `Selamat datang, ${user.name}!`);
+      await loginWithGoogle();
       router.replace('/(tabs)');
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Login dengan Google gagal.';
-      // Jika user membatalkan (menutup browser), tidak perlu tampilkan alert
-      if (!message.includes('dibatalkan')) {
-        setErrorMessage(message);
-        Alert.alert('Login Google Gagal', message);
-      }
+      const result = getAuthFeedback(error);
+      if (!result.cancelled) showFeedback(result);
     } finally {
       setGoogleLoading(false);
     }
@@ -83,6 +83,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="light-content" />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -106,10 +107,13 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.formContainer}>
-          {errorMessage ? (
-            <View style={styles.errorBanner}>
-              <Feather name="alert-circle" size={18} color="#D32F2F" style={{ marginTop: 2 }} />
-              <Text style={styles.errorBannerText}>{errorMessage}</Text>
+          {feedback ? (
+            <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              <Feather name="info" size={18} color={NotaryColors.danger} style={{ marginTop: 2 }} />
+              <View style={styles.errorContent}>
+                <Text style={styles.errorBannerTitle}>{feedback.title}</Text>
+                <Text style={styles.errorBannerText}>{feedback.message}</Text>
+              </View>
             </View>
           ) : null}
 
@@ -118,12 +122,17 @@ export default function LoginScreen() {
             <View style={styles.inputWrapper}>
               <Feather name="user" size={20} color="#7a7a7a" style={styles.inputIcon} />
               <TextInput
+                ref={emailRef}
                 style={styles.input}
                 placeholder="Masukkan email"
+                placeholderTextColor={NotaryColors.badgeNeutralText}
+                selectionColor={NotaryColors.primary}
+                underlineColorAndroid="transparent"
+                accessibilityLabel="Email"
                 value={email}
                 onChangeText={(t) => {
                   setEmail(t);
-                  if (errorMessage) setErrorMessage(null);
+                  if (feedback) setFeedback(null);
                 }}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -146,8 +155,15 @@ export default function LoginScreen() {
                 ref={passwordRef}
                 style={styles.input}
                 placeholder="Masukkan kata sandi"
+                placeholderTextColor={NotaryColors.badgeNeutralText}
+                selectionColor={NotaryColors.primary}
+                underlineColorAndroid="transparent"
+                accessibilityLabel="Kata sandi"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  if (feedback) setFeedback(null);
+                }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoComplete="password"
@@ -157,6 +173,8 @@ export default function LoginScreen() {
                 returnKeyType="done"
               />
               <TouchableOpacity
+                style={styles.passwordToggle}
+                accessibilityRole="button"
                 onPress={() => setShowPassword((current) => !current)}
                 disabled={isDisabled}
                 accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}>
@@ -173,6 +191,9 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[styles.loginButton, isDisabled && styles.loginButtonDisabled]}
             onPress={handleLogin}
+            accessibilityRole="button"
+            accessibilityLabel="Masuk"
+            accessibilityState={{ disabled: isDisabled, busy: submitting }}
             disabled={isDisabled}>
             {submitting ? (
               <ActivityIndicator color="#ffffff" />
@@ -192,6 +213,8 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[styles.googleButton, isDisabled && styles.loginButtonDisabled]}
             onPress={handleGoogleLogin}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isDisabled, busy: googleLoading }}
             disabled={isDisabled}
             accessibilityLabel="Masuk dengan Google">
             {googleLoading ? (
@@ -203,18 +226,10 @@ export default function LoginScreen() {
               </>
             )}
           </TouchableOpacity>
+          <Text style={styles.accountHint}>Gunakan email yang sudah didaftarkan oleh Notaris.</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-/** Ikon Google sederhana menggunakan teks berwarna */
-function GoogleIcon() {
-  return (
-    <View style={styles.googleIconContainer}>
-      <Text style={styles.googleIconText}>G</Text>
-    </View>
   );
 }
 
@@ -264,21 +279,22 @@ const styles = StyleSheet.create({
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#FFEBEE',
+    backgroundColor: NotaryColors.badgeDangerBg,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
+    borderColor: NotaryColors.badgeDangerBg,
     borderRadius: 12,
     padding: 12,
     gap: 8,
     marginBottom: 20,
   },
   errorBannerText: {
-    flex: 1,
-    color: '#D32F2F',
+    color: NotaryColors.badgeDangerText,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500',
   },
+  errorContent: { flex: 1, gap: 4 },
+  errorBannerTitle: { color: NotaryColors.badgeDangerText, fontSize: 14, fontWeight: '600' },
   inputGroup: { marginBottom: 20 },
   inputLabel: { color: '#1d1d1f', fontSize: 14, fontWeight: '600', marginBottom: 8 },
   inputWrapper: {
@@ -289,11 +305,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     backgroundColor: '#ffffff',
-    height: 52,
+    minHeight: 52,
   },
   inputIcon: { marginRight: 12 },
-  inputIconRight: { marginLeft: 12 },
-  input: { flex: 1, fontSize: 16, color: '#1d1d1f' },
+  inputIconRight: { marginLeft: 0 },
+  passwordToggle: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, minWidth: 0, paddingVertical: 12, fontSize: 16, color: NotaryColors.textPrimary },
   loginButton: {
     backgroundColor: '#17352D',
     borderRadius: 9999,
@@ -317,29 +334,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 9999,
-    borderWidth: 1.5,
-    borderColor: '#e0e0e0',
+    borderWidth: 1,
+    borderColor: '#747775',
     backgroundColor: '#ffffff',
     gap: 10,
   },
-  googleIconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  googleIconText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285F4',
-  },
+  accountHint: { color: NotaryColors.badgeNeutralText, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 12 },
   googleButtonText: {
-    color: '#1d1d1f',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#1F1F1F',
+    fontSize: 14,
+    lineHeight: 20,
+    flexShrink: 1,
+    fontWeight: '500',
   },
 });
