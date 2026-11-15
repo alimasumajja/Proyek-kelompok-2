@@ -329,12 +329,17 @@ function AktaForm({ akta, onClose }: { akta: Akta | null; onClose: () => void })
         onChange={(v) => set('jenis', v)}
       />
 
-      <FormField label="Nama pihak terkait" required error={errors.pihak}>
+      <FormField
+        label="Nama penghadap / pihak terkait"
+        required
+        error={errors.pihak}
+        hint="Satu nama per baris. Awali dengan QQ. untuk pihak yang diwakili, mis. QQ. PT Contoh.">
         <Input
           value={form.pihak}
           onChangeText={(v) => set('pihak', v)}
+          rows={3}
           invalid={!!errors.pihak}
-          accessibilityLabel="Nama pihak terkait"
+          accessibilityLabel="Nama penghadap atau pihak terkait"
         />
       </FormField>
 

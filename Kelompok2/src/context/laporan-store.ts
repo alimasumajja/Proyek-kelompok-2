@@ -3,15 +3,19 @@ import { Alert } from 'react-native';
 import {
   ambilDokumen,
   ambilKonfirmasi,
+  ambilPengaturan,
   ambilSemuaAkta,
   mintaRevisiDb,
   setujuiLaporanDb,
   simpanKonfirmasi,
+  simpanNomorSuratDb,
+  simpanPengaturanDb,
   tambahAktaDb,
   ubahAktaDb,
 } from '@/lib/laporan-api';
 import { supabase } from '@/lib/supabase';
-import type {Akta, AktaInput, DokumenLaporan, LaporanSummary, NamaTemplate, ValidasiItem,} from '@/types/laporan';
+import type { Akta, AktaInput, DokumenLaporan, LaporanSummary, PengaturanLaporan, ValidasiItem } from '@/types/laporan';
+import { PENGATURAN_DEFAULT } from '@/utils/laporan-pengaturan';
 import { formatDateId, parseInputDate } from '@/utils/date';
 
 /**
@@ -87,8 +91,8 @@ interface LaporanState {
   diperbarui: Date;
   /** Status dokumen laporan per periode (kunci: lihat `kunciPeriode`). */
   dokumen: Record<string, DokumenLaporan>;
-  /** Template format dokumen yang sedang dipakai. */
-  templateId: NamaTemplate;
+  /** Pengaturan tampilan dokumen (kop, kolom, judul, font, margin). Satu untuk seluruh kantor. */
+  pengaturan: PengaturanLaporan;
   /** True sementara data sedang diambil dari server. */
   memuat: boolean;
   /** True setelah data pertama berhasil dimuat. */
@@ -104,7 +108,7 @@ function stateAwal(): LaporanState {
     kategoriKosong: [],
     diperbarui: new Date(),
     dokumen: {},
-    templateId: 'Ringkas',
+    pengaturan: PENGATURAN_DEFAULT,
     memuat: false,
     dimuat: false,
   };
@@ -152,6 +156,10 @@ async function muatDokumen() {
   emit({ dokumen: await ambilDokumen() });
 }
 
+async function muatPengaturan() {
+  emit({ pengaturan: await ambilPengaturan() });
+}
+
 async function muatKonfirmasi() {
   const { bulan, tahun } = state;
   const kategori = await ambilKonfirmasi(bulan, tahun);
@@ -163,7 +171,7 @@ async function muatKonfirmasi() {
 export async function muatSemua() {
   emit({ memuat: true });
   try {
-    await Promise.all([muatAkta(), muatDokumen(), muatKonfirmasi()]);
+    await Promise.all([muatAkta(), muatDokumen(), muatKonfirmasi(), muatPengaturan()]);
     emit({ memuat: false, dimuat: true });
   } catch (error) {
     emit({ memuat: false });
@@ -244,6 +252,7 @@ const DOKUMEN_BARU: DokumenLaporan = {
   status: 'Draf',
   versiFinal: 0,
   catatanRevisi: '',
+  nomorSurat: '',
   snapshot: null,
 };
 
@@ -282,8 +291,28 @@ export async function mintaRevisi(catatan: string): Promise<boolean> {
   }
 }
 
-export function setTemplate(templateId: NamaTemplate) {
-  emit({ templateId });
+/** Menyimpan nomor surat pengantar untuk periode aktif. */
+export async function simpanNomorSurat(nomor: string): Promise<boolean> {
+  try {
+    await simpanNomorSuratDb(state.bulan, state.tahun, nomor);
+    await muatDokumen();
+    return true;
+  } catch (error) {
+    lapor('Nomor surat gagal disimpan', error);
+    return false;
+  }
+}
+
+/** Menyimpan pengaturan tampilan dokumen untuk seluruh kantor. */
+export async function simpanPengaturan(pengaturan: PengaturanLaporan): Promise<boolean> {
+  try {
+    await simpanPengaturanDb(pengaturan);
+    emit({ pengaturan });
+    return true;
+  } catch (error) {
+    lapor('Pengaturan gagal disimpan', error);
+    return false;
+  }
 }
 
 /** Status dokumen laporan pada periode yang sedang dilihat. */

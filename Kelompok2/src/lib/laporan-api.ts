@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import type { Akta, AktaInput, DokumenLaporan, SifatAkta, StatusAkta } from '@/types/laporan';
+import type { Akta, AktaInput, DokumenLaporan, PengaturanLaporan, SifatAkta, StatusAkta } from '@/types/laporan';
+import { normalisasiPengaturan, PENGATURAN_DEFAULT } from '@/utils/laporan-pengaturan';
 
 /**
  * Lapisan data Laporan ⇄ Supabase.
@@ -127,19 +128,20 @@ const kunci = (bulanDb: number, tahun: number) => `${tahun}-${bulanDb - 1}`;
 /** Semua dokumen laporan (beserta snapshot versi final terbaru), siap dipakai store. */
 export async function ambilDokumen(): Promise<Record<string, DokumenLaporan>> {
   const periode = cek(
-    await supabase.from('laporan_periode').select('id, tahun, bulan, status, versi_final, catatan_revisi'),
+    await supabase.from('laporan_periode').select('id, tahun, bulan, status, versi_final, catatan_revisi, nomor_surat'),
   ) as {
     id: string; tahun: number; bulan: number;
-    status: DokumenLaporan['status']; versi_final: number; catatan_revisi: string;
+    status: DokumenLaporan['status']; versi_final: number; catatan_revisi: string; nomor_surat: string | null;
   }[];
 
   const snapshots = cek(
     await supabase
       .from('laporan_snapshot')
-      .select('periode_id, versi, periode_label, disetujui_pada, akta')
+      .select('periode_id, versi, periode_label, disetujui_pada, akta, pengaturan, nomor_surat')
       .order('versi', { ascending: false }),
   ) as {
     periode_id: string; versi: number; periode_label: string; disetujui_pada: string; akta: AktaRow[];
+    pengaturan: unknown; nomor_surat: string | null;
   }[];
 
   const hasil: Record<string, DokumenLaporan> = {};
@@ -150,12 +152,24 @@ export async function ambilDokumen(): Promise<Record<string, DokumenLaporan>> {
       status: p.status,
       versiFinal: p.versi_final,
       catatanRevisi: p.catatan_revisi ?? '',
+      nomorSurat: p.nomor_surat ?? '',
       snapshot: s
-        ? { periodeLabel: s.periode_label, disetujuiPada: s.disetujui_pada, akta: s.akta.map(rowKeAkta) }
+        ? {
+            periodeLabel: s.periode_label,
+            disetujuiPada: s.disetujui_pada,
+            akta: s.akta.map(rowKeAkta),
+            nomorSurat: s.nomor_surat ?? undefined,
+            pengaturan: s.pengaturan ? normalisasiPengaturan(s.pengaturan) : undefined,
+          }
         : null,
     };
   }
   return hasil;
+}
+
+/** Menyimpan nomor surat pengantar untuk satu periode (ditolak server bila periode sudah Final). */
+export async function simpanNomorSuratDb(bulan: number, tahun: number, nomor: string): Promise<void> {
+  cek(await supabase.rpc('simpan_nomor_surat', { p_tahun: tahun, p_bulan: bulan + 1, p_nomor: nomor }));
 }
 
 /** Hanya Notaris. Snapshot dibuat di server dari data akta periode tersebut. */
@@ -166,4 +180,40 @@ export async function setujuiLaporanDb(bulan: number, tahun: number, periodeLabe
 /** Hanya Notaris. */
 export async function mintaRevisiDb(bulan: number, tahun: number, catatan: string): Promise<void> {
   cek(await supabase.rpc('minta_revisi', { p_tahun: tahun, p_bulan: bulan + 1, p_catatan: catatan }));
+}
+// ───────────────────────── Pengaturan tampilan dokumen (satu untuk seluruh kantor) ─────────────────────────
+
+interface PengaturanRow {
+  kop: unknown;
+  penerima: string;
+  ukuran_font: string;
+  margin: string;
+}
+
+/** Pengaturan kantor. Bila tabel belum ada atau kosong, memakai nilai bawaan agar layar tetap jalan. */
+export async function ambilPengaturan(): Promise<PengaturanLaporan> {
+  const { data, error } = await supabase
+    .from('laporan_pengaturan')
+    .select('kop, penerima, ukuran_font, margin')
+    .eq('id', 'kantor')
+    .maybeSingle();
+  if (error) {
+    console.warn(`[laporan] pengaturan memakai nilai bawaan: ${error.message}`);
+    return PENGATURAN_DEFAULT;
+  }
+  if (!data) return PENGATURAN_DEFAULT;
+  const r = data as PengaturanRow;
+  return normalisasiPengaturan({ kop: r.kop, penerima: r.penerima, ukuranFont: r.ukuran_font, margin: r.margin });
+}
+
+export async function simpanPengaturanDb(p: PengaturanLaporan): Promise<void> {
+  cek(
+    await supabase.from('laporan_pengaturan').upsert({
+      id: 'kantor',
+      kop: p.kop,
+      penerima: p.penerima,
+      ukuran_font: p.ukuranFont,
+      margin: p.margin,
+    }),
+  );
 }
