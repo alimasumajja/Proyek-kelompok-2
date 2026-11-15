@@ -4,21 +4,30 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import { Alert, AppState } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { UserAccount } from '@/types/profile';
 import type { UserRole } from '@/types/service';
 import { getInitials } from '@/utils/service';
 import { useServiceStore } from '@/context/service-store';
-import { getAccountStatusOverride, verifyLocalAccount } from '@/lib/account-registry';
+import { NATIVE_OAUTH_REDIRECT, parseOAuthCallback } from '@/utils/oauth';
+import { AuthFlowError } from '@/utils/auth-errors';
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthContextValue {
   user: UserAccount | null;
   loading: boolean;
-  login: (emailOrUsername: string, password: string) => Promise<UserAccount>;
+  login: (email: string, password: string) => Promise<UserAccount>;
+  loginWithGoogle: () => Promise<UserAccount>;
+  completeGoogleLogin: (url: string) => Promise<UserAccount>;
   logout: () => Promise<void>;
   checkActiveStatus: () => Promise<boolean>;
 }
@@ -50,32 +59,82 @@ function mapProfile(profile: ProfileRow, email: string): UserAccount {
 }
 
 async function fetchUserProfile(userId: string, email: string): Promise<UserAccount> {
-  const { data, error } = await supabase
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 1. Coba cari profil berdasarkan User ID
+  let { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, role, is_active')
+    .select('id, full_name, role, is_active, email')
     .eq('id', userId)
     .maybeSingle();
 
+  // 2. Jika tidak ditemukan berdasarkan ID (mis. user OAuth baru yang emailnya sudah didaftarkan Notaris),
+  // cari berdasarkan email yang terdaftar di profiles.
+  if (!data && normalizedEmail) {
+    const { data: byEmail } = await supabase
+      .from('profiles')
+      .select('id, full_name, role, is_active, email')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (byEmail) {
+      data = byEmail;
+    }
+  }
+
   if (error || !data) {
-    throw new Error('Profil akun tidak ditemukan atau akses ditolak. Hubungi Notaris.');
+    throw new AuthFlowError('profile_not_registered');
   }
 
-  const profile = data as ProfileRow;
+  const profile = data as ProfileRow & { email: string | null };
+
+  // KUNCI KEAMANAN: Email yang sedang login HARUS SESUAI dengan email aktif yang didaftarkan Notaris!
+  // Mencegah akun Google lama yang sudah diganti oleh Notaris tetap bisa masuk.
+  const registeredEmail = (profile.email ?? '').trim().toLowerCase();
+  if (registeredEmail && normalizedEmail && registeredEmail !== normalizedEmail) {
+    throw new AuthFlowError('profile_email_mismatch');
+  }
+
   if (!profile.is_active) {
-    throw new Error(
-      'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-    );
+    throw new AuthFlowError('profile_inactive');
   }
 
-  return mapProfile(profile, email);
+  return mapProfile(profile, registeredEmail || email);
+}
+
+async function createSessionFromUrl(url: string): Promise<Session | null> {
+  const params = parseOAuthCallback(url);
+
+  if (params.code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
+    if (error) throw error;
+    return data.session;
+  }
+
+  if (params.access_token && params.refresh_token) {
+    const { data, error } = await supabase.auth.setSession({
+      access_token: params.access_token,
+      refresh_token: params.refresh_token,
+    });
+    if (error) throw error;
+    return data.session;
+  }
+
+  if (params.error || params.error_description) {
+    throw new Error(params.error_description || params.error || 'Akses autentikasi ditolak.');
+  }
+
+  return null;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setRole } = useServiceStore();
   const [user, setUser] = useState<UserAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const callbackAttempt = useRef<{ url: string; promise: Promise<UserAccount> } | null>(null);
 
   const logout = useCallback(async () => {
+    callbackAttempt.current = null;
     try {
       await supabase.auth.signOut();
     } catch {
@@ -109,20 +168,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Verifikasi status akun aktif saat aplikasi kembali ke foreground
   const checkActiveStatus = useCallback(async (): Promise<boolean> => {
     if (!user) return false;
-
-    // Untuk akun lokal mock
-    if (user.id.startsWith('acc-') || user.id.startsWith('mock-') || user.id.startsWith('local-')) {
-      const localResult = await verifyLocalAccount(user.email || user.username, user.password || '');
-      if (localResult && localResult.isInactive) {
-        await logout();
-        Alert.alert(
-          'Akses Ditolak',
-          'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
-        );
-        return false;
-      }
-      return true;
-    }
 
     // Untuk akun Supabase
     try {
@@ -161,10 +206,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' && mounted) {
         setUser(null);
         setLoading(false);
+      } else if (
+        (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') &&
+        mounted &&
+        session
+      ) {
+        // Tangani callback web OAuth: setelah detectSessionInUrl=true membaca token dari URL hash,
+        // Supabase menembak SIGNED_IN → kita pulihkan sesi pengguna.
+        // Hindari permintaan Supabase bersarang di dalam lock event Auth.
+        setTimeout(() => { if (mounted) void restoreSession(session); }, 0);
       }
     });
 
@@ -178,32 +232,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
 
-    // 1. Cek realtime jika akun Supabase
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    if (!user.id.startsWith('acc-') && !user.id.startsWith('mock-')) {
-      channel = supabase
-        .channel(`user-profile-status-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'profiles',
-            filter: `id=eq.${user.id}`,
-          },
-          (payload) => {
-            const updated = payload.new as { is_active?: boolean };
-            if (updated && updated.is_active === false) {
-              void logout();
-              Alert.alert(
-                'Akses Ditolak',
-                'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
-              );
-            }
+    // Semua sesi berasal dari Supabase Auth; status profil dipantau melalui Realtime.
+    const channel = supabase
+      .channel(`user-profile-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as { is_active?: boolean };
+          if (updated && updated.is_active === false) {
+            void logout();
+            Alert.alert(
+              'Akses Ditolak',
+              'Akun Anda telah dinonaktifkan oleh Notaris. Anda telah dikeluarkan dari sistem.'
+            );
           }
-        )
-        .subscribe();
-    }
+        }
+      )
+      .subscribe();
 
     // 2. Cek saat user kembali ke app (AppState)
     const appStateSub = AppState.addEventListener('change', (nextState) => {
@@ -219,95 +270,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id, logout, checkActiveStatus]);
 
   const login = useCallback(
-    async (emailOrUsername: string, passwordInput: string) => {
-      const trimmed = emailOrUsername.trim();
-
-      // 0. Cek apakah akun tercatat nonaktif di status overrides
-      const override = await getAccountStatusOverride(trimmed);
-      if (override === 'Nonaktif') {
-        throw new Error(
-          'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-        );
+    async (emailInput: string, passwordInput: string) => {
+      const email = emailInput.trim().toLowerCase();
+      if (!email || !passwordInput) {
+        throw new Error('Email dan kata sandi wajib diisi.');
       }
 
-      // 1. Cek terlebih dahulu di registry akun lokal / dummy
-      const localResult = await verifyLocalAccount(trimmed, passwordInput);
-      if (localResult) {
-        if (!localResult.ok) {
-          throw new Error(
-            localResult.error || 'Akun Anda tidak aktif atau kata sandi tidak sesuai.'
-          );
-        }
-        if (localResult.account) {
-          setRole(localResult.account.role);
-          setUser(localResult.account);
-          return localResult.account;
-        }
-      }
-
-      // 2. Cek apakah ada di tabel public.akun
-      try {
-        const { data: akunData } = await supabase
-          .from('akun')
-          .select('id, name, username, email, password, role, status')
-          .or(`email.eq.${trimmed.toLowerCase()},username.eq.${trimmed.toLowerCase()}`)
-          .maybeSingle();
-
-        if (akunData) {
-          const akunStatus = (akunData.status || 'Aktif').toLowerCase();
-          const overrideAkun = await getAccountStatusOverride(akunData.id);
-          if (akunStatus === 'nonaktif' || overrideAkun === 'Nonaktif') {
-            throw new Error(
-              'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-            );
-          }
-
-          if (akunData.password && akunData.password === passwordInput) {
-            const userRole: UserRole =
-              akunData.role.toLowerCase() === 'notaris' ? 'Notaris' : 'Staf';
-            const userAcc: UserAccount = {
-              id: akunData.id,
-              username: akunData.username,
-              password: '',
-              name: akunData.name,
-              email: akunData.email,
-              initials: getInitials(akunData.name),
-              role: userRole,
-              status: 'Aktif',
-            };
-            setRole(userAcc.role);
-            setUser(userAcc);
-            return userAcc;
-          }
-        }
-      } catch (errAkun) {
-        if (errAkun instanceof Error && errAkun.message.includes('dinonaktifkan')) {
-          throw errAkun;
-        }
-      }
-
-      // 3. Jika belum masuk, coba autentikasi dengan Supabase Auth
+      // Satu-satunya sumber autentikasi adalah Supabase Auth.
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: trimmed.toLowerCase(),
+        email,
         password: passwordInput,
       });
 
       if (error) {
-        const errorMsg = error.message.toLowerCase();
-        // Deteksi jika akun di-ban / dinonaktifkan di Supabase Auth
-        if (
-          errorMsg.includes('banned') ||
-          errorMsg.includes('disabled') ||
-          errorMsg.includes('inactive')
-        ) {
-          throw new Error(
-            'Akun Anda telah dinonaktifkan oleh Notaris. Akses login ditolak. Hubungi Notaris untuk mengaktifkan kembali akun Anda.'
-          );
-        }
-        throw new Error('Email atau kata sandi tidak sesuai.');
+        throw error;
       }
 
-      if (!data.user?.email) throw new Error('Data pengguna dari Supabase tidak lengkap.');
+      if (!data.user?.email) {
+        throw new Error('Data pengguna dari Supabase tidak lengkap.');
+      }
 
       try {
         const profile = await fetchUserProfile(data.user.id, data.user.email);
@@ -323,13 +304,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [setRole]
   );
 
+  const completeGoogleLogin = useCallback((url: string): Promise<UserAccount> => {
+    // Browser dan route dapat menerima URL yang sama. Tukarkan kode hanya sekali.
+    if (callbackAttempt.current?.url === url) return callbackAttempt.current.promise;
+    const promise = (async () => {
+      try {
+        const session = await createSessionFromUrl(url);
+        if (!session?.user?.email) throw new Error('Gagal memproses sesi autentikasi Google.');
+        const profile = await fetchUserProfile(session.user.id, session.user.email);
+        setRole(profile.role);
+        setUser(profile);
+        return profile;
+      } catch (error) {
+        await supabase.auth.signOut().catch(() => {});
+        setUser(null);
+        throw error;
+      }
+    })();
+    callbackAttempt.current = { url, promise };
+    return promise;
+  }, [setRole]);
+
+  const loginWithGoogle = useCallback(async (): Promise<UserAccount> => {
+    // Pada platform Web: gunakan redirect browser langsung agar tidak terblokir popup blocker.
+    if (Platform.OS === 'web') {
+      const webRedirect = typeof window !== 'undefined' ? window.location.origin : Linking.createURL('/');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: webRedirect,
+          skipBrowserRedirect: false,
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+      if (error) {
+        throw error;
+      }
+      if (data?.url && typeof window !== 'undefined') {
+        window.location.href = data.url;
+      }
+      // Halaman akan berpindah ke Google OAuth
+      return new Promise(() => {}) as Promise<UserAccount>;
+    }
+
+    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+      throw new AuthFlowError('expo_go_unsupported');
+    }
+    callbackAttempt.current = null;
+    // Development build juga memiliki hostUri Metro; callback tetap memakai scheme aplikasi.
+    const redirectUrl = NATIVE_OAUTH_REDIRECT;
+    if (__DEV__) {
+      console.log('[Google OAuth] Redirect URL target:', redirectUrl);
+    }
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.url) {
+      throw new Error('Gagal mendapatkan tautan autentikasi Google.');
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
+      showInRecents: true,
+    });
+
+    if (__DEV__) {
+      console.log('[Google OAuth] Status browser:', result.type);
+    }
+
+    if (result.type !== 'success' || !result.url) {
+      throw new AuthFlowError('oauth_cancelled');
+    }
+
+    return completeGoogleLogin(result.url);
+  }, [completeGoogleLogin]);
+
   useEffect(() => {
     if (user) setRole(user.role);
   }, [user, setRole]);
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, checkActiveStatus }),
-    [user, loading, login, logout, checkActiveStatus]
+    () => ({ user, loading, login, loginWithGoogle, completeGoogleLogin, logout, checkActiveStatus }),
+    [user, loading, login, loginWithGoogle, completeGoogleLogin, logout, checkActiveStatus]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,1 +1,14 @@
-reference/
+/petunjuk.md
+
+# Antigravity / agent config
+/.agents/
+/AGENTS.md
+/GEMINI.md
+/CHANGELOG.md
+
+# Supabase root-level (bukan project)
+/supabase/
+
+# Schema dumps sementara
+/schema.sql
+/supabase_schema.sql

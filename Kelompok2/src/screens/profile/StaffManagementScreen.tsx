@@ -100,7 +100,7 @@ export function StaffManagementScreen({ onBack }: StaffManagementScreenProps) {
         onSave={async ({ name, email, username, password }) => {
           try {
             if (editing) {
-              await updateStaff(editing.id, { name });
+              await updateStaff(editing.id, { name, email });
               showToast('Data staf diperbarui');
             } else {
               await addStaff({ name, email, username, password });

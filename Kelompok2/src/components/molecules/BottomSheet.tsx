@@ -45,7 +45,7 @@ export function BottomSheet({
       onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable
           style={styles.backdrop}
           onPress={onClose}
@@ -66,7 +66,10 @@ export function BottomSheet({
               </AppText>
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}>
             {children}
           </ScrollView>
         </View>
@@ -99,5 +102,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  scrollContent: {
+    paddingBottom: 24,
   },
 });

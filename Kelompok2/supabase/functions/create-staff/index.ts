@@ -76,12 +76,12 @@ Deno.serve(async (req: Request) => {
 
   const username = String(body.username ?? '').trim().toLowerCase();
 
-  // 3. Buat akun login, lalu profilnya. Gagal di profil → batalkan akun login.
+  // 3. Buat akun login, lalu profilnya. Gagal di profil -> batalkan akun login.
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: name, role: 'staff', username },
+    user_metadata: { full_name: name, username },
   });
   if (createErr || !created.user) {
     const taken = /already|registered|exists/i.test(createErr?.message ?? '');
@@ -125,6 +125,15 @@ Deno.serve(async (req: Request) => {
     console.error('simpan profil gagal:', profErr.message);
     await admin.auth.admin.deleteUser(created.user.id);
     return json({ error: 'Gagal menyimpan profil staf: ' + profErr.message }, 400);
+  }
+
+  // 4. Catat audit trail secara resmi melalui RPC record_staff_created
+  const { error: auditErr } = await admin.rpc('record_staff_created', {
+    p_actor_id: auth.user.id,
+    p_target_id: created.user.id,
+  });
+  if (auditErr) {
+    console.warn('Peringatan: Gagal mencatat audit staff_created:', auditErr.message);
   }
 
   return json({ ok: true, id: created.user.id });

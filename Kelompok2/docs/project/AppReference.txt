@@ -1,0 +1,406 @@
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+
+type Page =
+  | "home"
+  | "services"
+  | "add"
+  | "reports"
+  | "profile"
+  | "notifications"
+  | "detail"
+  | "repertorium"
+  | "reportPreview"
+  | "staff";
+type Role = "Notaris" | "Staf";
+type ServiceStatus = "Aktif" | "Perlu Perhatian" | "Terlambat" | "Selesai";
+
+type Service = {
+  id: string;
+  client: string;
+  type: string;
+  stage: string;
+  progress: number;
+  staff: string;
+  due: string;
+  status: ServiceStatus;
+  priority: "Normal" | "Tinggi" | "Mendesak";
+};
+
+type ServiceNote = {
+  id: string;
+  category: "Pembaruan Progres" | "Kendala" | "Instruksi" | "Catatan Klien" | "Catatan Internal";
+  text: string;
+  author: string;
+  time: string;
+};
+
+type Activity = {
+  id: string;
+  title: string;
+  text: string;
+  time: string;
+  tone: string;
+};
+
+type RepertoryEntry = {
+  id: string;
+  no: string;
+  deed: string;
+  date: string;
+  type: string;
+  party: string;
+  nature: string;
+  status: string;
+  notes: string;
+  corrected?: boolean;
+};
+
+const stages = [
+  "Penerimaan Berkas",
+  "Verifikasi Dokumen",
+  "Penyusunan Draf",
+  "Penyelesaian Draf",
+  "Revisi Draf",
+  "Pelaksanaan Akad",
+  "Proses Pendaftaran",
+  "Penerbitan dan Penyerahan Hasil",
+];
+
+const initialServices: Service[] = [
+  { id: "LAY-2026-0021", client: "Budi Santoso", type: "Pendirian Perseroan Terbatas", stage: "Penyusunan Draf", progress: 37.5, staff: "Andi Pratama", due: "18 Mar 2026", status: "Aktif", priority: "Normal" },
+  { id: "LAY-2026-0022", client: "Siti Rahmawati", type: "Akta Jual Beli", stage: "Revisi Draf", progress: 50, staff: "Rina Amelia", due: "14 Mar 2026", status: "Perlu Perhatian", priority: "Tinggi" },
+  { id: "LAY-2026-0023", client: "Dedi Kurniawan", type: "Pendaftaran Hak Tanggungan", stage: "Proses Pendaftaran", progress: 87.5, staff: "Andi Pratama", due: "10 Mar 2026", status: "Terlambat", priority: "Mendesak" },
+  { id: "LAY-2026-0024", client: "Maya Puspitasari", type: "Legalisasi", stage: "Penerbitan dan Penyerahan Hasil", progress: 100, staff: "Rina Amelia", due: "8 Mar 2026", status: "Selesai", priority: "Normal" },
+];
+
+const initialNotes: Record<string, ServiceNote[]> = {
+  "LAY-2026-0022": [{ id: "N-1", category: "Kendala", text: "Menunggu konfirmasi jadwal penandatanganan dari salah satu pihak.", author: "Rina Amelia", time: "12 Mar 2026 · 09.16" }],
+};
+
+const initialActivities: Record<string, Activity[]> = Object.fromEntries(initialServices.map((service) => [service.id, [
+  { id: `${service.id}-1`, title: "Tahap diperbarui", text: `${service.staff} memindahkan layanan ke ${service.stage}`, time: "10 Mar", tone: "green" },
+  { id: `${service.id}-2`, title: "Target penyelesaian diubah", text: `Nadia Larasati menetapkan target ${service.due}`, time: "8 Mar", tone: "blue" },
+  { id: `${service.id}-3`, title: "Penanggung jawab ditetapkan", text: `Ditugaskan kepada ${service.staff}`, time: "24 Feb", tone: "amber" },
+  { id: `${service.id}-4`, title: "Layanan dibuat", text: "Data layanan didaftarkan oleh Rina Amelia", time: "23 Feb", tone: "green" },
+]]));
+
+const initialRepertory: RepertoryEntry[] = [
+  { id: "REP-001", no: "001", deed: "12/2026", date: "2026-03-03", type: "Pendirian PT", party: "PT Nusa Karya Sentosa", nature: "Minuta", status: "Terbit", notes: "Telah dicatat dan diperiksa." },
+  { id: "REP-002", no: "002", deed: "13/2026", date: "2026-03-07", type: "Akta Jual Beli", party: "Siti Rahmawati & Hendra Wijaya", nature: "Minuta", status: "Terbit", notes: "" },
+  { id: "REP-003", no: "003", deed: "14/2026", date: "2026-03-10", type: "Perjanjian Kredit", party: "Dedi Kurniawan", nature: "Minuta", status: "Draf", notes: "Menunggu pemeriksaan akhir." },
+];
+
+const iconPaths: Record<string, ReactNode> = {
+  home: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5M9 21v-7h6v7"/></>,
+  briefcase: <><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v2h4v-2"/></>,
+  plus: <path d="M12 5v14M5 12h14"/>,
+  chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,
+  user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+  filter: <path d="M4 6h16M7 12h10M10 18h4"/>,
+  chevron: <path d="m9 18 6-6-6-6"/>,
+  back: <path d="m15 18-6-6 6-6"/>,
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
+  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+  warning: <><path d="M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></>,
+  check: <path d="m5 12 4 4L19 6"/>,
+  edit: <><path d="m14 4 6 6L8 22H2v-6Z"/><path d="m12 6 6 6"/></>,
+  sparkle: <><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5Z"/><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7Z"/></>,
+  file: <><path d="M6 2h9l5 5v15H6Z"/><path d="M14 2v6h6M9 13h8M9 17h8"/></>,
+  logout: <><path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 3h7v18h-7"/></>,
+  more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></>,
+  lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
+  copy: <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3"/></>,
+};
+
+function Icon({ name, size = 20 }: { name: string; size?: number }) {
+  return <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
+}
+
+function Avatar({ name, small = false }: { name: string; small?: boolean }) {
+  const initials = name.split(" ").map((n) => n[0]).slice(0, 2).join("");
+  return <div className={`avatar ${small ? "avatar-small" : ""}`}>{initials}</div>;
+}
+
+function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: string }) {
+  return <span className={`badge badge-${tone}`}>{children}</span>;
+}
+
+function Progress({ value }: { value: number }) {
+  return <div className="progress"><span style={{ width: `${value}%` }} /></div>;
+}
+
+function AppBar({ title, onBack, action }: { title: string; onBack?: () => void; action?: ReactNode }) {
+  return <div className="appbar">{onBack ? <button className="icon-button" onClick={onBack} aria-label="Kembali"><Icon name="back" /></button> : <div className="brand-mark">N</div>}<strong>{title}</strong><div className="appbar-action">{action}</div></div>;
+}
+
+function BottomNav({ page, navigate }: { page: Page; navigate: (p: Page) => void }) {
+  const items: { page: Page; label: string; icon: string }[] = [
+    { page: "home", label: "Beranda", icon: "home" },
+    { page: "services", label: "Layanan", icon: "briefcase" },
+    { page: "add", label: "Tambah", icon: "plus" },
+    { page: "reports", label: "Laporan", icon: "chart" },
+    { page: "profile", label: "Profil", icon: "user" },
+  ];
+  return <nav className="bottom-nav">{items.map((item) => <button key={item.page} className={`${page === item.page ? "active" : ""} ${item.page === "add" ? "add-nav" : ""}`} onClick={() => navigate(item.page)}><span><Icon name={item.icon} size={item.page === "add" ? 24 : 21} /></span><small>{item.label}</small></button>)}</nav>;
+}
+
+function ServiceCard({ service, onClick }: { service: Service; onClick: () => void }) {
+  const tone = service.status === "Terlambat" ? "danger" : service.status === "Selesai" ? "success" : service.status === "Perlu Perhatian" ? "warning" : "info";
+  return <button className="service-card" onClick={onClick}>
+    <div className="service-top"><span className="service-id">{service.id}</span><Badge tone={tone}>{service.status === "Terlambat" && <Icon name="clock" size={13} />}{service.status}</Badge></div>
+    <strong className="client-name">{service.client}</strong>
+    <span className="service-type">{service.type}</span>
+    <div className="stage-row"><span>{service.stage}</span><b>{service.progress}%</b></div>
+    <Progress value={service.progress} />
+    <div className="service-meta"><span><Avatar name={service.staff} small />{service.staff}</span><span><Icon name="calendar" size={15} />{service.due}</span></div>
+  </button>;
+}
+
+function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  return <div className="overlay" onMouseDown={onClose}><section className="sheet" onMouseDown={(e) => e.stopPropagation()}><div className="sheet-handle" /><div className="sheet-title"><strong>{title}</strong><button className="text-button" onClick={onClose}>Tutup</button></div>{children}</section></div>;
+}
+
+function Splash() {
+  return <div className="splash"><div className="splash-logo"><span>N</span></div><div className="wordmark">Notaris<span>AI</span></div><p>Manajemen Operasional Kantor Notaris</p><div className="loader"><span /></div></div>;
+}
+
+function Login({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail] = useState("notaris@kantor.id");
+  const [password, setPassword] = useState("demo1234");
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!email.includes("@") || password.length < 6) return setError("Email atau kata sandi tidak valid.");
+    setError(""); setLoading(true);
+    window.setTimeout(onLogin, 650);
+  }
+  return <div className="auth-screen"><div className="auth-top"><div className="brand-lockup"><div className="brand-mark large">N</div><div className="wordmark small">Notaris<span>AI</span></div></div><div><Badge tone="gold"><Icon name="lock" size={13} /> Akses aman kantor</Badge><h1>Selamat Datang</h1><p>Masuk untuk memantau layanan kantor Anda.</p></div></div><form className="login-form" onSubmit={submit}><label>Email<div className="input-wrap"><Icon name="mail" size={19} /><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@kantor.id" /></div></label><label>Kata sandi<div className="input-wrap"><Icon name="lock" size={19} /><input type={show ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" onClick={() => setShow(!show)} aria-label="Tampilkan kata sandi"><Icon name="eye" size={19} /></button></div></label>{error && <div className="inline-error"><Icon name="warning" size={17} />{error}</div>}<button className="primary-button" disabled={loading}>{loading ? "Memverifikasi..." : "Masuk"}</button><p className="demo-hint">Akun demo telah terisi otomatis. Tidak ada data nyata yang digunakan.</p></form></div>;
+}
+
+function Home({ services, onOpen, navigate, openFiltered }: { services: Service[]; onOpen: (s: Service) => void; navigate: (p: Page) => void; openFiltered: (filter: string) => void }) {
+  const priorities = services.filter((s) => s.status === "Terlambat" || s.status === "Perlu Perhatian");
+  return <div className="page home-page"><header className="home-header"><div className="home-head-row"><div><p className="eyebrow">SELASA, 12 MARET 2026</p><h1>Selamat pagi, Nadia</h1></div><button className="avatar-button" onClick={() => navigate("profile")}><Avatar name="Nadia Larasati" /></button></div><p>Berikut ringkasan operasional kantor hari ini.</p><button className="notification-button" onClick={() => navigate("notifications")}><Icon name="bell" /><i>3</i></button></header>
+    <main className="content dashboard-content"><section className="stat-grid"><button className="stat-card green" onClick={() => openFiltered("Aktif")}><span><Icon name="briefcase" /></span><b>{services.filter(s => s.status !== "Selesai").length + 21}</b><small>Layanan Aktif</small><em>Ketuk untuk melihat</em></button><button className="stat-card" onClick={() => openFiltered("Selesai")}><span><Icon name="check" /></span><b>12</b><small>Layanan Selesai</small><em>Bulan ini</em></button><button className="stat-card alert" onClick={() => openFiltered("Terlambat")}><span><Icon name="clock" /></span><b>3</b><small>Terlambat</small><em>Perlu tindakan</em></button><button className="stat-card warning" onClick={() => openFiltered("Perlu Perhatian")}><span><Icon name="warning" /></span><b>5</b><small>Perlu Perhatian</small><em>2 kendala baru</em></button></section>
+    <section><div className="section-title"><div><p className="eyebrow">PRIORITAS HARI INI</p><h2>Perlu Perhatian</h2></div><button className="text-button" onClick={() => openFiltered("Perlu Perhatian")}>Lihat Semua</button></div><div className="stack">{priorities.map(s => <ServiceCard key={s.id} service={s} onClick={() => onOpen(s)} />)}</div></section>
+    <section><div className="section-title"><div><p className="eyebrow">DEADLINE</p><h2>Target Terdekat</h2></div></div><div className="deadline-card"><div className="date-block"><b>14</b><span>MAR</span></div><div><strong>Akta Jual Beli</strong><p>Siti Rahmawati · Revisi Draf</p><span><Avatar name="Rina Amelia" small /> Rina Amelia</span></div><Icon name="chevron" /></div></section>
+    <section className="last-section"><div className="section-title"><div><p className="eyebrow">AKTIVITAS</p><h2>Aktivitas Terbaru</h2></div></div><div className="timeline"><Timeline title="Andi memperbarui tahap" text="LAY-2026-0023 · Proses Pendaftaran" time="10.24" tone="green" /><Timeline title="Rina menambahkan kendala" text="Menunggu konfirmasi jadwal para pihak" time="09.16" tone="amber" /><Timeline title="Layanan telah selesai" text="LAY-2026-0024 · Maya Puspitasari" time="Kemarin" tone="blue" /></div></section></main></div>;
+}
+
+function Timeline({ title, text, time, tone }: { title: string; text: string; time: string; tone: string }) {
+  return <div className="timeline-item"><i className={tone} /><div><strong>{title}</strong><p>{text}</p></div><time>{time}</time></div>;
+}
+
+function Services({ services, onOpen, navigate, initialFilter, onFilterChange }: { services: Service[]; onOpen: (s: Service) => void; navigate: (p: Page) => void; initialFilter: string; onFilterChange: (filter: string) => void }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState(initialFilter);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const shown = services.filter(s => (filter === "Semua" || s.status === filter || (filter === "Aktif" && s.status === "Perlu Perhatian")) && `${s.id} ${s.client} ${s.type}`.toLowerCase().includes(search.toLowerCase()));
+  function chooseFilter(value: string) { setFilter(value); onFilterChange(value); }
+  return <div className="page"><AppBar title="Layanan" action={<button className="icon-button" onClick={() => navigate("add")} aria-label="Tambah layanan"><Icon name="plus" /></button>} /><main className="content services-content"><div className="search-row"><div className="search"><Icon name="search" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nomor, klien, atau jenis layanan" /></div><button className="filter-button" onClick={() => setFilterOpen(true)} aria-label="Buka filter"><Icon name="filter" /></button></div>{filter === "Perlu Perhatian" && <div className="active-filter"><Icon name="warning" size={15} /> Filter: Perlu Perhatian <button onClick={() => chooseFilter("Semua")}>Hapus</button></div>}<div className="segments">{["Semua", "Aktif", "Terlambat", "Selesai"].map(f => <button className={filter === f ? "active" : ""} onClick={() => chooseFilter(f)} key={f}>{f}</button>)}</div><div className="list-heading"><span>{shown.length} layanan ditemukan</span><button onClick={() => chooseFilter(filter === "Semua" ? "Terlambat" : "Semua")}><Icon name="filter" size={15} /> {filter === "Semua" ? "Prioritas" : "Reset"}</button></div><div className="stack">{shown.length ? shown.map(s => <ServiceCard key={s.id} service={s} onClick={() => onOpen(s)} />) : <div className="empty"><div><Icon name="search" /></div><strong>Tidak ada layanan ditemukan</strong><p>Coba ubah kata kunci atau filter pencarian Anda.</p></div>}</div></main>{filterOpen && <Modal title="Filter Layanan" onClose={() => setFilterOpen(false)}><div className="form-stack"><label>Tahap pengerjaan<select><option>Semua tahap</option>{stages.map(s => <option key={s}>{s}</option>)}</select></label><label>Penanggung jawab<select><option>Semua staf</option><option>Andi Pratama</option><option>Rina Amelia</option></select></label><label>Prioritas<select><option>Semua prioritas</option><option>Mendesak</option><option>Tinggi</option><option>Normal</option></select></label><button className="primary-button" onClick={() => setFilterOpen(false)}>Terapkan Filter</button></div></Modal>}</div>;
+}
+
+function AddService({ onSave, onBack }: { onSave: (s: Service) => void; onBack: () => void }) {
+  const [form, setForm] = useState({ client: "", type: "", received: "2026-03-12", staff: "", contact: "", need: "", priority: "Normal", due: "" });
+  const [errors, setErrors] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const update = (key: string, value: string) => setForm({ ...form, [key]: value });
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const missing = ["client", "type", "received", "staff"].filter(k => !form[k as keyof typeof form]);
+    if (missing.length) return setErrors(missing);
+    setSaving(true);
+    window.setTimeout(() => onSave({ id: `LAY-2026-00${25 + Math.floor(Math.random() * 20)}`, client: form.client, type: form.type, stage: stages[0], progress: 0, staff: form.staff, due: form.due ? new Date(form.due).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Belum ditentukan", status: "Aktif", priority: form.priority as Service["priority"] }), 700);
+  }
+  const fieldError = (k: string) => errors.includes(k);
+  return <div className="page"><AppBar title="Tambah Layanan" onBack={onBack} /><form className="content form-page" onSubmit={submit}><div className="form-intro"><div><Icon name="briefcase" /></div><h2>Layanan baru</h2><p>Isi informasi operasional layanan. Nomor layanan akan dibuat otomatis.</p></div><p className="form-section-label">INFORMASI UTAMA</p><div className="form-card"><label>Nama klien <em>*</em><input className={fieldError("client") ? "invalid" : ""} value={form.client} onChange={e => update("client", e.target.value)} placeholder="Masukkan nama lengkap" />{fieldError("client") && <small className="error-text">Nama klien wajib diisi</small>}</label><label>Jenis layanan <em>*</em><select className={fieldError("type") ? "invalid" : ""} value={form.type} onChange={e => update("type", e.target.value)}><option value="">Pilih jenis layanan</option><option>Pendirian Perseroan Terbatas</option><option>Akta Jual Beli</option><option>Legalisasi</option><option>Pendaftaran Hak Tanggungan</option></select></label><label>Tanggal diterima <em>*</em><input type="date" value={form.received} onChange={e => update("received", e.target.value)} /></label><label>Penanggung jawab <em>*</em><select className={fieldError("staff") ? "invalid" : ""} value={form.staff} onChange={e => update("staff", e.target.value)}><option value="">Pilih staf</option><option>Andi Pratama</option><option>Rina Amelia</option><option>Nadia Larasati</option></select></label></div><p className="form-section-label">DETAIL TAMBAHAN</p><div className="form-card"><label>Kontak klien<input value={form.contact} onChange={e => update("contact", e.target.value)} placeholder="Nomor telepon atau email" /></label><label>Deskripsi singkat kebutuhan<textarea value={form.need} onChange={e => update("need", e.target.value)} placeholder="Jelaskan kebutuhan klien secara ringkas" rows={3} /></label><label>Prioritas<select value={form.priority} onChange={e => update("priority", e.target.value)}><option>Normal</option><option>Tinggi</option><option>Mendesak</option></select></label><label>Target penyelesaian<input type="date" value={form.due} onChange={e => update("due", e.target.value)} /></label></div><div className="info-note"><Icon name="sparkle" /><span>Tahap awal otomatis: <strong>Penerimaan Berkas</strong></span></div><button className="primary-button save-button" disabled={saving}>{saving ? "Menyimpan layanan..." : "Simpan Layanan"}</button></form></div>;
+}
+
+function Detail({ service, onBack, onUpdate, role, notes, activities, onAddNote, onAddActivity }: { service: Service; onBack: () => void; onUpdate: (s: Service) => void; role: Role; notes: ServiceNote[]; activities: Activity[]; onAddNote: (note: ServiceNote) => void; onAddActivity: (activity: Activity) => void }) {
+  const [tab, setTab] = useState("Ringkasan");
+  const [sheet, setSheet] = useState<"stage" | "note" | "ai" | "assignment" | "actions" | null>(null);
+  const [note, setNote] = useState("");
+  const [category, setCategory] = useState<ServiceNote["category"]>("Pembaruan Progres");
+  const [nextStage, setNextStage] = useState(service.stage);
+  const [stageAction, setStageAction] = useState("Lanjut ke tahap berikutnya");
+  const [stageNote, setStageNote] = useState("");
+  const [assignedStaff, setAssignedStaff] = useState(service.staff);
+  const [targetDate, setTargetDate] = useState("2026-03-18");
+  const currentIndex = stages.indexOf(service.stage);
+  const actor = role === "Notaris" ? "Nadia Larasati" : "Andi Pratama";
+  function saveStage() {
+    const isRepeat = stageAction === "Ulangi tahap revisi";
+    const isSkip = stageAction === "Lewati Proses Pendaftaran";
+    const target = isRepeat ? "Revisi Draf" : isSkip ? "Penerbitan dan Penyerahan Hasil" : nextStage;
+    const targetIndex = stages.indexOf(target);
+    const progress = isRepeat ? service.progress : Math.max(service.progress, (targetIndex + 1) * 12.5);
+    onUpdate({ ...service, stage: target, progress });
+    onAddActivity({ id: `A-${Date.now()}`, title: isRepeat ? "Tahap revisi diulang" : isSkip ? "Tahap dilewati" : "Tahap diperbarui", text: isSkip ? `${actor} melewati Proses Pendaftaran berdasarkan konfigurasi layanan. ${stageNote || "Alasan dicatat pada konfirmasi."}` : `${actor} mengubah tahap dari ${service.stage} ke ${target}.${stageNote ? ` ${stageNote}` : ""}`, time: "Baru saja", tone: isSkip ? "amber" : "green" });
+    setSheet(null);
+    setTab("Riwayat");
+  }
+  function saveNote() {
+    const newNote: ServiceNote = { id: `N-${Date.now()}`, category, text: note, author: actor, time: "Baru saja" };
+    onAddNote(newNote);
+    onAddActivity({ id: `A-${Date.now()}`, title: category === "Kendala" ? "Kendala baru dicatat" : "Catatan ditambahkan", text: `${actor}: ${note}`, time: "Baru saja", tone: category === "Kendala" ? "amber" : "blue" });
+    setNote("");
+    setSheet(null);
+    setTab("Catatan");
+  }
+  function saveAssignment() {
+    onUpdate({ ...service, staff: assignedStaff, due: new Date(targetDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) });
+    onAddActivity({ id: `A-${Date.now()}`, title: "Penugasan dan target diubah", text: `${actor} menugaskan ${assignedStaff} dengan target ${new Date(targetDate).toLocaleDateString("id-ID")}.`, time: "Baru saja", tone: "blue" });
+    setSheet(null);
+  }
+  const skippedRegistration = activities.some((a) => a.title === "Tahap dilewati");
+  const repeatedRevision = activities.filter((a) => a.title === "Tahap revisi diulang").length;
+  return <div className="page detail-page"><AppBar title="Detail Layanan" onBack={onBack} action={<button className="icon-button" onClick={() => setSheet("actions")} aria-label="Tindakan layanan"><Icon name="more" /></button>} /><main className="detail-scroll"><section className="detail-hero"><div className="detail-id-row"><span>{service.id}</span><Badge tone={service.status === "Terlambat" ? "danger" : "info"}>{service.status}</Badge></div><h1>{service.client}</h1><p>{service.type}</p><div className="hero-meta"><span><Icon name="calendar" /> Target {service.due}</span><span><Avatar name={service.staff} small /> {service.staff}</span></div></section><div className="detail-tabs">{["Ringkasan", "Alur Kerja", "Catatan", "Riwayat"].map(t => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}</button>)}</div>
+    <div className="detail-content">{tab === "Ringkasan" && <><section className="card progress-card"><div className="section-title compact"><div><p className="eyebrow">PROGRES KESELURUHAN</p><h2>{service.stage}</h2></div><b className="progress-number">{service.progress}%</b></div><Progress value={service.progress} /><p className="calculation-note">Dihitung dari tahap yang diselesaikan, bukan waktu berjalan.</p><div className="progress-info"><span><small>Mulai tahap</small><b>10 Mar 2026</b></span><span><small>Durasi tahap</small><b>2 hari</b></span><span><small>Total durasi</small><b>18 hari</b></span></div></section><button className="primary-button" onClick={() => setSheet("stage")}><Icon name="edit" /> Perbarui Tahap</button><section className="card"><div className="section-title compact"><h2>Penugasan & Target</h2>{role === "Notaris" ? <button className="text-button" onClick={() => setSheet("assignment")}>Ubah</button> : <Badge tone="neutral"><Icon name="lock" size={11} /> Notaris</Badge>}</div><div className="assignment"><Avatar name={service.staff} /><div><small>Penanggung jawab</small><strong>{service.staff}</strong><p>Pendukung: Rina Amelia</p></div></div><div className="target-row"><Icon name="calendar" /><div><small>Target penyelesaian</small><strong>{service.due}</strong></div><Badge tone={service.status === "Terlambat" ? "danger" : "success"}>{service.status === "Terlambat" ? "Terlewati" : "Sesuai target"}</Badge></div></section><section className="ai-callout"><div><Icon name="sparkle" /></div><span><strong>Butuh ringkasan cepat?</strong><p>AI dapat merangkum progres dan kendala layanan ini.</p></span><button onClick={() => setSheet("ai")}>Coba AI</button></section></>}
+    {tab === "Alur Kerja" && <section className="card workflow"><div className="section-title compact"><div><p className="eyebrow">8 TAHAP LAYANAN</p><h2>Alur Kerja</h2></div></div>{stages.map((stage, i) => { const skipped = stage === "Proses Pendaftaran" && skippedRegistration; return <div key={stage} className={`workflow-step ${skipped ? "skipped" : i < currentIndex ? "done" : i === currentIndex ? "current" : ""}`}><div className="step-marker">{i < currentIndex && !skipped ? <Icon name="check" size={15} /> : i + 1}</div><div><strong>{stage}</strong>{stage === "Revisi Draf" && repeatedRevision > 0 && <Badge tone="warning">Diulang {repeatedRevision + 1}x</Badge>}<p>{skipped ? "Dilewati · alasan tercatat di riwayat" : i < currentIndex ? "Selesai · 8 Mar 2026, 16.20" : i === currentIndex ? "Tahap aktif · dimulai 10 Mar 2026" : "Belum dimulai"}</p></div></div>; })}</section>}
+    {tab === "Catatan" && <><div className="section-title"><div><p className="eyebrow">PEMBARUAN</p><h2>Catatan Progres & Kendala</h2></div><button className="text-button" onClick={() => setSheet("note")}>+ Tambah</button></div>{notes.length ? notes.map(n => <section key={n.id} className="card note-card"><div><Badge tone={n.category === "Kendala" ? "warning" : "info"}>{n.category}</Badge><time>{n.time}</time></div><p>{n.text}</p><span><Avatar name={n.author} small /> {n.author}</span></section>) : <div className="empty compact-empty"><div><Icon name="edit" /></div><strong>Belum ada catatan</strong><p>Tambahkan pembaruan progres atau kendala pertama.</p></div>}</>}
+    {tab === "Riwayat" && <section className="card timeline history">{activities.map(a => <Timeline key={a.id} title={a.title} text={a.text} time={a.time} tone={a.tone} />)}</section>}</div></main>
+    {sheet === "stage" && <Modal title="Perbarui Tahap" onClose={() => setSheet(null)}><div className="sheet-summary"><small>Tahap saat ini</small><strong>{service.stage}</strong></div><div className="form-stack"><label>Jenis perubahan<select value={stageAction} onChange={e => setStageAction(e.target.value)}><option>Lanjut ke tahap berikutnya</option><option>Ulangi tahap revisi</option><option>Lewati Proses Pendaftaran</option></select></label>{stageAction === "Lanjut ke tahap berikutnya" && <label>Pilih tahap berikutnya<select value={nextStage} onChange={e => setNextStage(e.target.value)}>{stages.slice(Math.max(0, currentIndex)).map(s => <option key={s}>{s}</option>)}</select></label>}<label>{stageAction === "Lewati Proses Pendaftaran" ? "Alasan wajib" : "Catatan progres (opsional)"}<textarea rows={3} value={stageNote} onChange={e => setStageNote(e.target.value)} placeholder="Tambahkan konteks perubahan tahap" /></label><div className="confirmation-note"><Icon name="warning" /> Perubahan, pengulangan, dan tahap yang dilewati akan tercatat dalam riwayat audit.</div><button className="primary-button" disabled={stageAction === "Lewati Proses Pendaftaran" && !stageNote.trim()} onClick={saveStage}>Konfirmasi Perubahan</button></div></Modal>}
+    {sheet === "note" && <Modal title="Tambah Catatan" onClose={() => setSheet(null)}><div className="form-stack"><label>Kategori<select value={category} onChange={e => setCategory(e.target.value as ServiceNote["category"])}><option>Pembaruan Progres</option><option>Kendala</option><option>Instruksi</option><option>Catatan Klien</option><option>Catatan Internal</option></select></label><label>Catatan<textarea rows={5} value={note} onChange={e => setNote(e.target.value)} placeholder={category === "Kendala" ? "Jelaskan masalah, kondisi saat ini, dan tindak lanjut..." : "Tulis pembaruan secara jelas..."} /></label>{category === "Kendala" && <div className="confirmation-note"><Icon name="warning" /> Mencatat kendala tidak mengubah tahap atau progres layanan.</div>}<button className="secondary-button" onClick={() => setSheet("ai")}><Icon name="sparkle" /> Bantu Susun dengan AI</button><button className="primary-button" disabled={!note.trim()} onClick={saveNote}>Simpan Catatan</button></div></Modal>}
+    {sheet === "assignment" && <Modal title="Ubah Penugasan & Target" onClose={() => setSheet(null)}><div className="form-stack"><label>Penanggung jawab<select value={assignedStaff} onChange={e => setAssignedStaff(e.target.value)}><option>Andi Pratama</option><option>Rina Amelia</option><option>Nadia Larasati</option></select></label><label>Target penyelesaian<input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)} /></label><div className="confirmation-note"><Icon name="warning" /> Perubahan akan ditambahkan ke riwayat audit.</div><button className="primary-button" onClick={saveAssignment}>Simpan Perubahan</button></div></Modal>}
+    {sheet === "actions" && <Modal title="Tindakan Layanan" onClose={() => setSheet(null)}><div className="action-list"><button onClick={() => { setSheet(null); setTab("Riwayat"); }}><Icon name="clock" /><span><strong>Lihat riwayat lengkap</strong><small>Perubahan tidak dapat dihapus diam-diam</small></span><Icon name="chevron" /></button><button onClick={() => setSheet("ai")}><Icon name="sparkle" /><span><strong>Buka Asisten AI</strong><small>Gunakan hanya teks yang dipilih</small></span><Icon name="chevron" /></button><div className="info-note"><Icon name="warning" /><span>Status Ditunda atau Dibatalkan memerlukan alasan dan otorisasi. Aturan ini masih dapat dikonfigurasi sesuai kebijakan kantor.</span></div></div></Modal>}
+    {sheet === "ai" && <AIModal onClose={() => setSheet(null)} />}</div>;
+}
+
+function AIModal({ onClose }: { onClose: () => void }) {
+  const [generated, setGenerated] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState("Layanan Akta Jual Beli sedang berada pada tahap revisi draf. Konfirmasi jadwal penandatanganan dari salah satu pihak masih dibutuhkan. Tindak lanjut disarankan sebelum target penyelesaian.");
+  const generate = () => { setLoading(true); window.setTimeout(() => { setLoading(false); setGenerated(true); }, 700); };
+  return <Modal title="Asisten AI" onClose={onClose}><div className="ai-sheet"><div className="privacy"><Icon name="lock" /><p><strong>Periksa informasi sensitif</strong><br />Teks yang dipilih dapat dikirim ke penyedia AI eksternal untuk diproses.</p></div><label>Pilih bantuan<select><option>Ringkas Progres</option><option>Ringkas Kebutuhan Klien</option><option>Buat Checklist</option><option>Bantu Susun Narasi</option></select></label><div className="context-box"><span>KONTEKS TERPILIH</span><p>Catatan progres dan kendala pada layanan ini (3 pembaruan).</p></div>{generated ? <div className="ai-result"><div><Badge tone="gold"><Icon name="sparkle" size={13} /> Draf AI</Badge><button onClick={() => navigator.clipboard?.writeText(result)}><Icon name="copy" size={17} /> Salin</button></div><textarea value={result} onChange={e => setResult(e.target.value)} rows={6} /><strong>Draft dari AI — wajib ditinjau sebelum digunakan.</strong><div className="button-row"><button className="secondary-button" onClick={generate}>Buat Ulang</button><button className="primary-button" onClick={onClose}>Gunakan Draf</button></div></div> : <button className="primary-button" onClick={generate}>{loading ? "Menyusun draf..." : <><Icon name="sparkle" /> Buat Draf</>}</button>}</div></Modal>;
+}
+
+function Reports({ navigate, role, emptyConfirmed, setEmptyConfirmed, recordCount }: { navigate: (p: Page) => void; role: Role; emptyConfirmed: boolean; setEmptyConfirmed: (value: boolean) => void; recordCount: number }) {
+  const [sheet, setSheet] = useState<"period" | "validation" | null>(null);
+  const [month, setMonth] = useState("Maret");
+  const [year, setYear] = useState("2026");
+  const [confirmWaarmerking, setConfirmWaarmerking] = useState(emptyConfirmed);
+  function saveValidation() { setEmptyConfirmed(confirmWaarmerking); setSheet(null); }
+  return <div className="page"><AppBar title="Laporan" /><main className="content report-page"><div className="period-card"><div><p className="eyebrow">PERIODE LAPORAN</p><h1>{month} {year}</h1><span>Terakhir diperbarui hari ini, 10.42</span></div><button onClick={() => setSheet("period")} aria-label="Pilih periode"><Icon name="calendar" /></button></div><section className="report-status"><div><Badge tone={emptyConfirmed ? "info" : "warning"}>{emptyConfirmed ? "Perlu Pemeriksaan" : "Validasi Diperlukan"}</Badge><h2>Laporan Bulanan</h2><p>Data ditarik dari layanan dan repertorium terstruktur.</p></div><div className="completion-ring">{emptyConfirmed ? 93 : 86}<small>%</small></div></section><div className="report-stats"><div><b>12</b><span>Layanan selesai</span></div><div><b>{recordCount}</b><span>Akta tercatat</span></div><div><b>{emptyConfirmed ? 1 : 2}</b><span>Perlu ditinjau</span></div></div><section><div className="section-title"><h2>Validasi Data</h2><button className="text-button" onClick={() => setSheet("validation")}>Periksa Semua</button></div><div className="card validation-list"><div><span className="valid-icon"><Icon name="check" /></span><p><strong>Daftar Akta</strong><br /><small>{recordCount} entri telah divalidasi</small></p><Badge tone="success">Lengkap</Badge></div><button className="validation-row" onClick={() => setSheet("validation")}><span className={emptyConfirmed ? "valid-icon" : "warn-icon"}><Icon name={emptyConfirmed ? "check" : "warning"} /></span><p><strong>Waarmerking</strong><br /><small>{emptyConfirmed ? "Nihil dikonfirmasi pengguna" : "Kategori tanpa data belum dikonfirmasi"}</small></p><Badge tone={emptyConfirmed ? "success" : "warning"}>{emptyConfirmed ? "Dikonfirmasi" : "Tinjau"}</Badge></button><div><span className="warn-icon"><Icon name="warning" /></span><p><strong>Akta Jaminan Fidusia</strong><br /><small>1 tanggal di luar periode — tidak diubah otomatis</small></p><Badge tone="warning">Tinjau</Badge></div></div></section><button className="primary-button" onClick={() => emptyConfirmed ? navigate("reportPreview") : setSheet("validation")}><Icon name="eye" /> {emptyConfirmed ? "Lihat Pratinjau Laporan" : "Selesaikan Validasi"}</button><button className="repertorium-link" onClick={() => navigate("repertorium")}><div><Icon name="file" /></div><span><strong>Repertorium</strong><p>Kelola catatan akta terstruktur</p></span><Badge tone="neutral">{recordCount} entri</Badge><Icon name="chevron" /></button>{role === "Staf" && <div className="info-note"><Icon name="lock" /><span>Staf dapat menyiapkan laporan, tetapi persetujuan final hanya dapat dilakukan oleh Notaris.</span></div>}</main>
+  {sheet === "period" && <Modal title="Pilih Periode Laporan" onClose={() => setSheet(null)}><div className="form-stack two-col"><label>Bulan<select value={month} onChange={e => setMonth(e.target.value)}><option>Januari</option><option>Februari</option><option>Maret</option><option>April</option></select></label><label>Tahun<select value={year} onChange={e => setYear(e.target.value)}><option>2025</option><option>2026</option></select></label><div className="info-note full"><Icon name="warning" /><span>Periode hanya mengubah simulasi tampilan. Data di luar periode akan ditandai, bukan dipindahkan otomatis.</span></div><button className="primary-button full" onClick={() => setSheet(null)}>Terapkan Periode</button></div></Modal>}
+  {sheet === "validation" && <Modal title="Validasi Kategori Laporan" onClose={() => setSheet(null)}><div className="validation-summary"><p>Periksa kategori tanpa data. Sistem tidak akan menyatakan nihil tanpa konfirmasi Anda.</p><label className="check-row"><input type="checkbox" checked={confirmWaarmerking} onChange={e => setConfirmWaarmerking(e.target.checked)} /><span><strong>Waarmerking tidak memiliki data</strong><small>Konfirmasi sebagai nihil untuk periode demo ini.</small></span></label><div className="warning-box"><Icon name="warning" /><p><strong>1 data di luar periode</strong><br />Akta Jaminan Fidusia perlu diperiksa manual dan tidak diubah otomatis.</p></div><button className="primary-button" disabled={!confirmWaarmerking} onClick={saveValidation}>Simpan Konfirmasi</button></div></Modal>}</div>;
+}
+
+function ReportPreview({ onBack, role, onFeedback }: { onBack: () => void; role: Role; onFeedback: (text: string) => void }) {
+  const [approved, setApproved] = useState(false);
+  const [dialog, setDialog] = useState<"approve" | "export" | "revision" | null>(null);
+  return <div className="page"><AppBar title="Pratinjau Laporan" onBack={onBack} action={<button className="text-button" onClick={() => setDialog("export")}>Ekspor</button>} /><main className="content preview-page"><div className="preview-meta"><Badge tone={approved ? "success" : "warning"}>{approved ? "Disetujui" : "Perlu Pemeriksaan"}</Badge><span>Versi {approved ? "1.0 disetujui" : "1.0"}</span></div><section className="paper"><div className="paper-head"><div className="seal">N</div><small>KANTOR NOTARIS<br /><b>NADIA LARASATI, S.H., M.Kn.</b></small></div><hr /><h2>LAPORAN BULANAN NOTARIS</h2><p>Periode Maret 2026</p><div className="report-table"><div><b>No.</b><b>Nomor Akta</b><b>Jenis Akta</b></div><div><span>1</span><span>12/2026</span><span>Pendirian PT</span></div><div><span>2</span><span>13/2026</span><span>Akta Jual Beli</span></div><div><span>3</span><span>14/2026</span><span>Perjanjian Kredit</span></div></div><div className="paper-sign"><p>Jakarta, 31 Maret 2026</p><br /><br /><strong>Nadia Larasati, S.H., M.Kn.</strong></div></section><div className="warning-box"><Icon name="warning" /><p><strong>1 bagian perlu ditinjau</strong><br />Satu data di luar periode tetap ditandai untuk pemeriksaan manual.</p></div>{approved ? <div className="approval-card"><Icon name="check" /><div><strong>Laporan disetujui</strong><p>Nadia Larasati · 12 Mar 2026, 11.04<br />Snapshot: RPT-2026-03-V1</p></div></div> : role === "Notaris" ? <div className="button-row sticky-actions"><button className="secondary-button" onClick={() => setDialog("revision")}>Minta Revisi</button><button className="primary-button" onClick={() => setDialog("approve")}>Setujui Laporan</button></div> : <div className="unauthorized"><Icon name="lock" /><div><strong>Persetujuan khusus Notaris</strong><p>Anda tetap dapat meninjau dan menyiapkan revisi laporan.</p></div></div>}<p className="legal-note">Pratinjau ini adalah simulasi dan bukan pernyataan kepatuhan hukum resmi.</p></main>
+  {dialog === "approve" && <div className="dialog-overlay"><div className="dialog"><div className="dialog-icon success"><Icon name="check" /></div><h2>Setujui laporan final?</h2><p>Versi 1.0 akan disimpan sebagai snapshot yang dapat diaudit. Koreksi setelah persetujuan membuat revisi baru.</p><div className="button-row"><button className="secondary-button" onClick={() => setDialog(null)}>Batal</button><button className="primary-button" onClick={() => { setApproved(true); setDialog(null); onFeedback("Laporan versi 1.0 berhasil disetujui"); }}>Ya, Setujui</button></div></div></div>}
+  {dialog === "revision" && <Modal title="Minta Revisi" onClose={() => setDialog(null)}><div className="form-stack"><label>Catatan revisi<textarea rows={4} placeholder="Jelaskan data atau bagian yang perlu diperbaiki" /></label><button className="primary-button" onClick={() => { setDialog(null); onFeedback("Permintaan revisi berhasil dikirim"); }}>Kirim Permintaan</button></div></Modal>}
+  {dialog === "export" && <Modal title="Ekspor Laporan" onClose={() => setDialog(null)}><div className="form-stack"><div className="info-note"><Icon name="file" /><span>Ekspor adalah simulasi. Format resmi harus divalidasi terlebih dahulu oleh kantor.</span></div><button className="secondary-button" onClick={() => { setDialog(null); onFeedback("Simulasi PDF berhasil disiapkan"); }}>Ekspor PDF</button><button className="secondary-button" onClick={() => { setDialog(null); onFeedback("Simulasi Word berhasil disiapkan"); }}>Ekspor Word</button></div></Modal>}</div>;
+}
+
+function Repertorium({ onBack, entries, setEntries, onFeedback }: { onBack: () => void; entries: RepertoryEntry[]; setEntries: (entries: RepertoryEntry[]) => void; onFeedback: (text: string) => void }) {
+  const emptyForm = { no: "", deed: "", date: "2026-03-12", type: "", party: "", nature: "Minuta", status: "Draf", notes: "" };
+  const [mode, setMode] = useState<"add" | "detail" | "edit" | "period" | null>(null);
+  const [selected, setSelected] = useState<RepertoryEntry | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const shown = entries.filter(e => `${e.deed} ${e.party} ${e.type}`.toLowerCase().includes(search.toLowerCase()));
+  const update = (key: string, value: string) => setForm({ ...form, [key]: value });
+  function openAdd() { setForm({ ...emptyForm, no: String(entries.length + 1).padStart(3, "0") }); setError(""); setMode("add"); }
+  function openDetail(entry: RepertoryEntry) { setSelected(entry); setMode("detail"); }
+  function openEdit() { if (!selected) return; setForm({ no: selected.no, deed: selected.deed, date: selected.date, type: selected.type, party: selected.party, nature: selected.nature, status: selected.status, notes: selected.notes }); setError(""); setMode("edit"); }
+  function saveRecord() {
+    if (!form.no || !form.deed || !form.date || !form.type || !form.party) return setError("Lengkapi nomor, tanggal, jenis akta, dan pihak terkait.");
+    const duplicate = entries.some(e => e.deed === form.deed && e.id !== selected?.id);
+    if (duplicate) return setError("Nomor akta sudah tercatat. Periksa aturan penomoran kantor.");
+    if (mode === "edit" && selected) {
+      const corrected = { ...selected, ...form, corrected: true };
+      setEntries(entries.map(e => e.id === selected.id ? corrected : e));
+      setSelected(corrected);
+      setMode("detail");
+      onFeedback("Koreksi repertorium dicatat dalam riwayat");
+    } else {
+      setEntries([...entries, { ...form, id: `REP-${Date.now()}` }]);
+      setMode(null);
+      onFeedback("Entri repertorium berhasil ditambahkan");
+    }
+  }
+  return <div className="page"><AppBar title="Repertorium" onBack={onBack} action={<button className="icon-button" onClick={openAdd} aria-label="Tambah repertorium"><Icon name="plus" /></button>} /><main className="content"><div className="search"><Icon name="search" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nomor akta atau pihak terkait" /></div><div className="list-heading"><span>{shown.length} catatan · Maret 2026</span><button onClick={() => setMode("period")}><Icon name="calendar" size={15} /> Periode</button></div><div className="record-list">{shown.map(e => <button key={e.id} className="record-card" onClick={() => openDetail(e)}><span className="record-number">{e.no}</span><div><div><strong>Akta No. {e.deed}</strong><Badge tone={e.status === "Terbit" ? "success" : "warning"}>{e.status}</Badge></div><p>{e.type}</p><span>{e.party}</span><small><Icon name="calendar" size={13} /> {new Date(e.date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}{e.corrected ? " · Dikoreksi" : ""}</small></div><Icon name="chevron" /></button>)}</div>{shown.length === 0 && <div className="empty"><div><Icon name="search" /></div><strong>Catatan tidak ditemukan</strong><p>Periksa kata kunci pencarian.</p></div>}<div className="info-note"><Icon name="file" /><span>Repertorium menyimpan data terstruktur, bukan dokumen atau lampiran. Nomor akta tidak dibuat otomatis.</span></div></main>
+  {(mode === "add" || mode === "edit") && <Modal title={mode === "edit" ? "Koreksi Repertorium" : "Tambah Repertorium"} onClose={() => setMode(null)}><div className="form-stack two-col"><label>Nomor urut<input value={form.no} onChange={e => update("no", e.target.value)} placeholder="Contoh: 004" /></label><label>Nomor akta<input value={form.deed} onChange={e => update("deed", e.target.value)} placeholder="Sesuai aturan kantor" /></label><label className="full">Tanggal akta<input type="date" value={form.date} onChange={e => update("date", e.target.value)} /></label><label className="full">Jenis akta<select value={form.type} onChange={e => update("type", e.target.value)}><option value="">Pilih jenis akta</option><option>Pendirian PT</option><option>Akta Jual Beli</option><option>Perjanjian Kredit</option></select></label><label className="full">Nama pihak terkait<textarea rows={2} value={form.party} onChange={e => update("party", e.target.value)} /></label><label>Sifat akta<select value={form.nature} onChange={e => update("nature", e.target.value)}><option>Minuta</option><option>In originali</option></select></label><label>Status<select value={form.status} onChange={e => update("status", e.target.value)}><option>Draf</option><option>Terbit</option></select></label><label className="full">Catatan<textarea rows={2} value={form.notes} onChange={e => update("notes", e.target.value)} /></label>{error && <div className="inline-error full"><Icon name="warning" size={17} />{error}</div>}{mode === "edit" && <div className="confirmation-note full"><Icon name="warning" /> Koreksi tidak menghapus catatan sebelumnya dan akan ditandai dalam riwayat.</div>}<button className="primary-button full" onClick={saveRecord}>{mode === "edit" ? "Simpan Koreksi" : "Simpan Catatan"}</button></div></Modal>}
+  {mode === "detail" && selected && <Modal title="Detail Repertorium" onClose={() => setMode(null)}><div className="record-detail"><div className="record-detail-head"><span className="record-number">{selected.no}</span><div><strong>Akta No. {selected.deed}</strong><p>{selected.type}</p></div><Badge tone={selected.status === "Terbit" ? "success" : "warning"}>{selected.status}</Badge></div><dl><div><dt>Tanggal akta</dt><dd>{new Date(selected.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</dd></div><div><dt>Pihak terkait</dt><dd>{selected.party}</dd></div><div><dt>Sifat akta</dt><dd>{selected.nature}</dd></div><div><dt>Dicatat oleh</dt><dd>Nadia Larasati · 12 Mar 2026</dd></div></dl>{selected.corrected && <div className="info-note"><Icon name="clock" /><span>Entri ini pernah dikoreksi. Versi sebelumnya tetap tercatat dalam audit simulasi.</span></div>}<button className="secondary-button" onClick={openEdit}><Icon name="edit" /> Edit atau Koreksi</button></div></Modal>}
+  {mode === "period" && <Modal title="Filter Periode" onClose={() => setMode(null)}><div className="form-stack"><label>Rentang tanggal<input type="month" defaultValue="2026-03" /></label><button className="primary-button" onClick={() => setMode(null)}>Terapkan Periode</button></div></Modal>}</div>;
+}
+
+function Notifications({ onBack, onOpen }: { onBack: () => void; onOpen: () => void }) {
+  const [read, setRead] = useState(false);
+  const notifications = [{ title: "Target penyelesaian terlewati", text: "LAY-2026-0023 melewati target pada 10 Maret 2026.", time: "10 menit lalu", tone: "danger" }, { title: "Kendala baru ditambahkan", text: "Rina menambahkan kendala pada LAY-2026-0022.", time: "1 jam lalu", tone: "warning" }, { title: "Layanan perlu pemeriksaan", text: "Draf LAY-2026-0021 siap diperiksa oleh Notaris.", time: "Kemarin, 16.40", tone: "info" }];
+  return <div className="page"><AppBar title="Notifikasi" onBack={onBack} action={<button className="text-button" onClick={() => setRead(true)}>Tandai dibaca</button>} /><main className="notification-list">{notifications.map((n, i) => <button className={`notification-item ${!read && i < 2 ? "unread" : ""}`} onClick={onOpen}><span className={`notification-icon ${n.tone}`}><Icon name={n.tone === "danger" ? "clock" : n.tone === "warning" ? "warning" : "file"} /></span><div><strong>{n.title}</strong><p>{n.text}</p><small>{n.time}</small></div>{!read && i < 2 && <i />}</button>)}</main></div>;
+}
+
+function Profile({ role, setRole, navigate, onLogout, onFeedback }: { role: Role; setRole: (r: Role) => void; navigate: (p: Page) => void; onLogout: () => void; onFeedback: (text: string) => void }) {
+  const [settings, setSettings] = useState<"account" | "notifications" | null>(null);
+  function switchRole(next: Role) { setRole(next); onFeedback(`Mode demo ${next} aktif`); }
+  return <div className="page"><AppBar title="Profil" /><main className="content profile-page"><section className="profile-card"><Avatar name={role === "Notaris" ? "Nadia Larasati" : "Andi Pratama"} /><h2>{role === "Notaris" ? "Nadia Larasati, S.H., M.Kn." : "Andi Pratama"}</h2><p>{role === "Notaris" ? "notaris@kantor.id" : "andi@kantor.id"}</p><Badge tone="gold">{role}</Badge></section><section><p className="form-section-label">MODE DEMO</p><div className="role-switch"><button className={role === "Notaris" ? "active" : ""} onClick={() => switchRole("Notaris")}><Icon name="briefcase" /><span><strong>Notaris</strong><small>Akses penuh & persetujuan</small></span></button><button className={role === "Staf" ? "active" : ""} onClick={() => switchRole("Staf")}><Icon name="user" /><span><strong>Staf</strong><small>Akses operasional</small></span></button></div><p className="role-disclaimer">Pembatasan antarmuka ini juga harus diterapkan kembali pada backend dan database produksi.</p></section><section><p className="form-section-label">AKUN & KANTOR</p><div className="settings-card"><button onClick={() => setSettings("account")}><Icon name="user" /><span><strong>Informasi Akun</strong><small>Nama, email, dan keamanan</small></span><Icon name="chevron" /></button>{role === "Notaris" && <button onClick={() => navigate("staff")}><Icon name="users" /><span><strong>Manajemen Staf</strong><small>3 akun aktif</small></span><Icon name="chevron" /></button>}<button onClick={() => setSettings("notifications")}><Icon name="bell" /><span><strong>Pengaturan Notifikasi</strong><small>Pengingat dan aktivitas</small></span><Icon name="chevron" /></button></div></section><button className="logout-button" onClick={onLogout}><Icon name="logout" /> Keluar dari Akun</button><p className="version">NotarisAI · Versi prototipe 1.0</p></main>
+  {settings === "account" && <Modal title="Informasi Akun" onClose={() => setSettings(null)}><div className="form-stack"><label>Nama<input defaultValue={role === "Notaris" ? "Nadia Larasati, S.H., M.Kn." : "Andi Pratama"} /></label><label>Email<input defaultValue={role === "Notaris" ? "notaris@kantor.id" : "andi@kantor.id"} /></label><button className="primary-button" onClick={() => { setSettings(null); onFeedback("Informasi akun berhasil diperbarui"); }}>Simpan Perubahan</button></div></Modal>}
+  {settings === "notifications" && <Modal title="Pengaturan Notifikasi" onClose={() => setSettings(null)}><div className="toggle-list"><label><span><strong>Target mendekat</strong><small>Pengingat sebelum tenggat</small></span><input type="checkbox" defaultChecked /></label><label><span><strong>Kendala baru</strong><small>Catatan kendala dan instruksi</small></span><input type="checkbox" defaultChecked /></label><label><span><strong>Layanan tanpa pembaruan</strong><small>Ambang demo: 3 hari</small></span><input type="checkbox" defaultChecked /></label></div><button className="primary-button" onClick={() => { setSettings(null); onFeedback("Pengaturan notifikasi disimpan"); }}>Simpan Pengaturan</button></Modal>}</div>;
+}
+
+function Staff({ onBack, onFeedback }: { onBack: () => void; onFeedback: (text: string) => void }) {
+  const [staff, setStaff] = useState([{ name: "Andi Pratama", email: "andi@kantor.id", active: true }, { name: "Rina Amelia", email: "rina@kantor.id", active: true }, { name: "Fajar Nugroho", email: "fajar@kantor.id", active: false }]);
+  const [editing, setEditing] = useState<number | "new" | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  function openEditor(index: number | "new") { setEditing(index); setName(index === "new" ? "" : staff[index].name); setEmail(index === "new" ? "" : staff[index].email); }
+  function save() { if (!name || !email.includes("@")) return; if (editing === "new") setStaff([...staff, { name, email, active: true }]); else if (typeof editing === "number") setStaff(staff.map((s, i) => i === editing ? { ...s, name, email } : s)); setEditing(null); onFeedback("Akun staf berhasil disimpan"); }
+  function toggle(index: number) { setStaff(staff.map((s, i) => i === index ? { ...s, active: !s.active } : s)); onFeedback(`Akun ${staff[index].active ? "dinonaktifkan" : "diaktifkan"}`); }
+  return <div className="page"><AppBar title="Manajemen Staf" onBack={onBack} action={<button className="icon-button" onClick={() => openEditor("new")} aria-label="Tambah staf"><Icon name="plus" /></button>} /><main className="content"><div className="search"><Icon name="search" /><input placeholder="Cari nama atau email staf" /></div><div className="staff-list">{staff.map((person, i) => <div className="staff-card" key={person.email}><Avatar name={person.name} /><div><strong>{person.name}</strong><p>{person.email}</p><Badge tone={person.active ? "success" : "neutral"}>{person.active ? "Aktif" : "Nonaktif"}</Badge></div><button className="icon-button" onClick={() => openEditor(i)} aria-label={`Edit ${person.name}`}><Icon name="more" /></button></div>)}</div></main>{editing !== null && <Modal title={editing === "new" ? "Tambah Staf" : "Edit Staf"} onClose={() => setEditing(null)}><div className="form-stack"><label>Nama staf<input value={name} onChange={e => setName(e.target.value)} /></label><label>Email<input value={email} onChange={e => setEmail(e.target.value)} /></label><label>Peran<select><option>Staf</option></select></label>{typeof editing === "number" && <button className="secondary-button" onClick={() => { toggle(editing); setEditing(null); }}>{staff[editing].active ? "Nonaktifkan Akun" : "Aktifkan Akun"}</button>}<button className="primary-button" disabled={!name || !email.includes("@")} onClick={save}>Simpan Akun</button></div></Modal>}</div>;
+}
+
+export default function App() {
+  const [splash, setSplash] = useState(() => !new URLSearchParams(window.location.search).has("app"));
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [page, setPage] = useState<Page>("home");
+  const [role, setRole] = useState<Role>("Notaris");
+  const [services, setServices] = useState(initialServices);
+  const [selected, setSelected] = useState<Service>(initialServices[1]);
+  const [serviceFilter, setServiceFilter] = useState("Semua");
+  const [notes, setNotes] = useState<Record<string, ServiceNote[]>>(initialNotes);
+  const [activities, setActivities] = useState<Record<string, Activity[]>>(initialActivities);
+  const [repertory, setRepertory] = useState<RepertoryEntry[]>(initialRepertory);
+  const [emptyCategoryConfirmed, setEmptyCategoryConfirmed] = useState(false);
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [toast, setToast] = useState("");
+  const rootPages = useMemo(() => ["home", "services", "add", "reports", "profile"].includes(page), [page]);
+  function navigate(p: Page) { setPage(p); window.scrollTo(0, 0); }
+  function feedback(text: string) { setToast(text); window.setTimeout(() => setToast(""), 2400); }
+  function openFiltered(filter: string) { setServiceFilter(filter); navigate("services"); }
+  function openService(s: Service) { setSelected(s); navigate("detail"); }
+  function updateService(s: Service) { setSelected(s); setServices(prev => prev.map(x => x.id === s.id ? s : x)); feedback("Perubahan berhasil disimpan"); }
+  function addNote(note: ServiceNote) { setNotes(prev => ({ ...prev, [selected.id]: [note, ...(prev[selected.id] || [])] })); feedback("Catatan berhasil disimpan"); }
+  function addActivity(activity: Activity) { setActivities(prev => ({ ...prev, [selected.id]: [activity, ...(prev[selected.id] || [])] })); }
+  function saveService(s: Service) {
+    setServices(prev => [s, ...prev]);
+    setNotes(prev => ({ ...prev, [s.id]: [] }));
+    setActivities(prev => ({ ...prev, [s.id]: [{ id: `A-${Date.now()}`, title: "Layanan dibuat", text: `${role === "Notaris" ? "Nadia Larasati" : "Andi Pratama"} membuat layanan dan menetapkan tahap Penerimaan Berkas.`, time: "Baru saja", tone: "green" }] }));
+    setSelected(s);
+    feedback(`${s.id} berhasil dibuat`);
+    navigate("detail");
+  }
+  if (splash) return <div className="phone-shell" onClick={() => setSplash(false)}><Splash /></div>;
+  if (!loggedIn) return <div className="phone-shell"><Login onLogin={() => setLoggedIn(true)} /></div>;
+  let screen: ReactNode;
+  if (page === "home") screen = <Home services={services} onOpen={openService} navigate={navigate} openFiltered={openFiltered} />;
+  else if (page === "services") screen = <Services services={services} onOpen={openService} navigate={navigate} initialFilter={serviceFilter} onFilterChange={setServiceFilter} />;
+  else if (page === "add") screen = <AddService onSave={saveService} onBack={() => navigate("home")} />;
+  else if (page === "detail") screen = <Detail service={selected} onBack={() => navigate("services")} onUpdate={updateService} role={role} notes={notes[selected.id] || []} activities={activities[selected.id] || []} onAddNote={addNote} onAddActivity={addActivity} />;
+  else if (page === "reports") screen = <Reports navigate={navigate} role={role} emptyConfirmed={emptyCategoryConfirmed} setEmptyConfirmed={setEmptyCategoryConfirmed} recordCount={repertory.length} />;
+  else if (page === "reportPreview") screen = <ReportPreview onBack={() => navigate("reports")} role={role} onFeedback={feedback} />;
+  else if (page === "repertorium") screen = <Repertorium onBack={() => navigate("reports")} entries={repertory} setEntries={setRepertory} onFeedback={feedback} />;
+  else if (page === "notifications") screen = <Notifications onBack={() => navigate("home")} onOpen={() => openService(services[2])} />;
+  else if (page === "staff") screen = <Staff onBack={() => navigate("profile")} onFeedback={feedback} />;
+  else screen = <Profile role={role} setRole={setRole} navigate={navigate} onLogout={() => setLogoutConfirm(true)} onFeedback={feedback} />;
+  return <div className="app-canvas"><div className="phone-shell">{screen}{rootPages && <BottomNav page={page} navigate={navigate} />}{toast && <div className="toast"><Icon name="check" />{toast}</div>}{logoutConfirm && <div className="dialog-overlay"><div className="dialog"><div className="dialog-icon"><Icon name="logout" /></div><h2>Keluar dari akun?</h2><p>Anda perlu masuk kembali untuk mengakses layanan kantor.</p><div className="button-row"><button className="secondary-button" onClick={() => setLogoutConfirm(false)}>Batal</button><button className="danger-button" onClick={() => { setLogoutConfirm(false); setLoggedIn(false); setPage("home"); }}>Ya, Keluar</button></div></div></div>}</div></div>;
+}

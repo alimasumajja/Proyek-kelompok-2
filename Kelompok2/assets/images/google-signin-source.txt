@@ -1,0 +1,9 @@
+Source: https://developers.google.com/identity/branding-guidelines
+Download: https://developers.google.com/static/identity/images/signin-assets.zip
+Retrieved: 2026-11-15
+Archive entry: Android + Web/PNG @3x/Light/Theme=Light, Show text=No, Shape=Pill, Platform=Android+Web@3x.png
+Also includes the matching official @1x and @2x PNG variants for Metro asset resolution.
+
+Original PNG retained without modification. GoogleIcon displays the central 20dp G
+inside the original 40dp button canvas. Brand colors and proportions are retained;
+no tint is applied. The surrounding button and localized label are rendered natively.

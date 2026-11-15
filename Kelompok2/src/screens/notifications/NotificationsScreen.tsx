@@ -16,16 +16,25 @@ interface NotificationsScreenProps {
 export function NotificationsScreen({ onBack, onOpenService }: NotificationsScreenProps) {
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
-  const { markAllNotificationsRead } = useServiceStore();
+  const { markAllNotificationsRead, markNotificationRead } = useServiceStore();
   // Hanya notifikasi dari layanan yang boleh dilihat akun aktif.
   const { notifications } = useSession();
+
+  const handlePressItem = (item: (typeof notifications)[number]) => {
+    if (!item.read) {
+      void markNotificationRead(item.id);
+    }
+    if (item.serviceId) {
+      onOpenService(item.serviceId);
+    }
+  };
 
   return (
     <View style={styles.screen}>
       <AppHeader
         title="Notifikasi"
         onBack={onBack}
-        textAction={{ label: 'Tandai dibaca', onPress: markAllNotificationsRead }}
+        textAction={{ label: 'Tandai dibaca', onPress: () => void markAllNotificationsRead() }}
       />
       <ScrollView
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
@@ -37,7 +46,7 @@ export function NotificationsScreen({ onBack, onOpenService }: NotificationsScre
             <NotificationRow
               key={item.id}
               item={item}
-              onPress={item.serviceId ? () => onOpenService(item.serviceId as string) : undefined}
+              onPress={() => handlePressItem(item)}
             />
           ))
         )}

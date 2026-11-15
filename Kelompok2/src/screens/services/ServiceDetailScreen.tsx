@@ -1,16 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotaryColors } from '@/constants/notary-theme';
-import { stageTimingData, supportStaffName } from '@/data/dummy';
 import { useServiceStore } from '@/context/service-store';
 import { useToast } from '@/context/toast';
 import { useSession } from '@/hooks/use-session';
 import { useStatusBarStyle } from '@/hooks/use-status-bar-style';
-import { formatDateId } from '@/utils/date';
-import { getInitials } from '@/utils/service';
-import { canAssignService, canViewService, isNotaris } from '@/utils/permissions';
-import { buildStageActivity, computeStageChange } from '@/utils/service-workflow';
+import { canAssignService, canViewService } from '@/utils/permissions';
+import { computeStageChange } from '@/utils/service-workflow';
 import { Button } from '@/components/atoms';
 import { AiCallout, EmptyState, UnderlineTabs } from '@/components/molecules';
 import {
@@ -36,8 +33,6 @@ type DetailTab = (typeof TABS)[number];
 type Sheet = 'stage' | 'note' | 'assignment' | 'actions' | 'ai' | null;
 
 const EMPTY_DRAFT: NoteDraft = { category: 'Pembaruan Progres', text: '' };
-const TIMELINE_DATE = (d: Date) =>
-  `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
 interface ServiceDetailScreenProps {
   serviceId: string;
@@ -46,17 +41,32 @@ interface ServiceDetailScreenProps {
 
 /**
  * Detail Layanan (Figma: Ringkasan, Alur Kerja, Catatan, Riwayat + sheet Perbarui Tahap,
- * Tambah Catatan, Ubah Penugasan, Tindakan, Asisten AI). Perubahan disimpan ke ServiceStore
- * sehingga langsung tampil di Beranda dan Layanan.
+ * Tambah Catatan, Ubah Penugasan, Tindakan, Asisten AI).
+ * Terintegrasi penuh dengan Supabase RPCs dan audit log.
  */
 export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenProps) {
   useStatusBarStyle('dark');
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { getService, updateService, notes, activities, addNote, addActivity, addNotification } =
-    useServiceStore();
+  const {
+    getService,
+    notes,
+    activities,
+    serviceTiming,
+    activeStaff,
+    fetchServiceDetails,
+    changeStage,
+    updateAssignment,
+    addNote,
+  } = useServiceStore();
   const { actor } = useSession();
-  const actorName = actor.name;
+
+  // Muat detail catatan, riwayat, dan durasi dari database Supabase
+  useEffect(() => {
+    if (serviceId) {
+      void fetchServiceDetails(serviceId);
+    }
+  }, [serviceId, fetchServiceDetails]);
 
   // Staf hanya boleh membuka layanan yang ditugaskan kepadanya (termasuk lewat notifikasi/tautan).
   const found = getService(serviceId);
@@ -64,6 +74,12 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
   const service = found && !forbidden ? found : undefined;
   const serviceNotes = notes[serviceId] ?? [];
   const serviceActivities = activities[serviceId] ?? [];
+  const timing = serviceTiming[serviceId] ?? {
+    currentStageStartedAt: service?.receivedDate ?? 'Hari ini',
+    currentStageDuration: '< 1 hari',
+    totalDuration: '< 1 hari',
+    completedStageAt: '—',
+  };
 
   const [tab, setTab] = useState<DetailTab>('Ringkasan');
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -101,47 +117,25 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
     setAiReturnTo(null);
   };
 
-  const confirmStage = (input: StageUpdateInput) => {
+  const confirmStage = async (input: StageUpdateInput) => {
     const result = computeStageChange(service, input.action, input.nextStage);
-    updateService({
-      ...service,
-      currentStage: result.targetStage,
-      progressPercent: result.progressPercent,
-    });
-    addActivity(service.id, buildStageActivity(service, result, actorName, input.note));
-    // Alur pemeriksaan: Staf menyelesaikan draf → Notaris diberi tahu untuk memeriksa.
-    if (!isNotaris(actor) && result.targetStage === 'Penyelesaian Draf') {
-      addNotification({
-        serviceId: service.id,
-        title: 'Draf siap diperiksa',
-        text: `${actorName} menyelesaikan draf ${service.code}.`,
-        tone: 'info',
-        audience: 'Notaris',
-      });
+    const res = await changeStage(service.id, result.targetStage, result.kind, input.note);
+    if (!res.ok) {
+      showToast(res.error || 'Gagal mengubah tahap');
+      return;
     }
     closeSheet();
     setTab('Riwayat');
-    showToast('Perubahan berhasil disimpan');
+    showToast('Tahap berhasil diperbarui');
   };
 
-  const saveNote = () => {
+  const saveNote = async () => {
     const text = noteDraft.text.trim();
     if (!text) return;
-    addNote(service.id, { category: noteDraft.category, text }, actorName);
-    addActivity(service.id, {
-      title: noteDraft.category === 'Kendala' ? 'Kendala baru dicatat' : 'Catatan ditambahkan',
-      text: `${actorName}: ${text}`,
-      tone: noteDraft.category === 'Kendala' ? 'amber' : 'blue',
-    });
-    // Kendala yang dicatat Staf langsung diteruskan ke Notaris.
-    if (noteDraft.category === 'Kendala' && !isNotaris(actor)) {
-      addNotification({
-        serviceId: service.id,
-        title: 'Kendala baru ditambahkan',
-        text: `${actorName} menambahkan kendala pada ${service.code}.`,
-        tone: 'warning',
-        audience: 'Notaris',
-      });
+    const res = await addNote(service.id, { category: noteDraft.category, text });
+    if (!res.ok) {
+      showToast(res.error || 'Gagal menyimpan catatan');
+      return;
     }
     setNoteDraft(EMPTY_DRAFT);
     closeSheet();
@@ -149,30 +143,18 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
     showToast('Catatan berhasil disimpan');
   };
 
-  const saveAssignment = ({ staffName, dueDate }: AssignmentInput) => {
-    updateService({
-      ...service,
-      assignedStaff: { name: staffName, initials: getInitials(staffName) },
-      dueDate: formatDateId(dueDate),
-    });
-    addActivity(service.id, {
-      title: 'Penugasan dan target diubah',
-      text: `${actorName} menugaskan ${staffName} dengan target ${TIMELINE_DATE(dueDate)}.`,
-      tone: 'blue',
-    });
-    // Staf yang baru ditugaskan mendapat pemberitahuan.
-    if (staffName !== service.assignedStaff.name) {
-      addNotification({
-        serviceId: service.id,
-        title: 'Layanan ditugaskan kepada Anda',
-        text: `${service.code} · ${service.clientName}`,
-        tone: 'info',
-        audience: 'Staf',
-        recipient: staffName,
-      });
+  const saveAssignment = async ({ staffId, dueDate }: AssignmentInput) => {
+    if (!staffId) {
+      showToast('Staf penanggung jawab tidak valid');
+      return;
+    }
+    const res = await updateAssignment(service.id, staffId, dueDate);
+    if (!res.ok) {
+      showToast(res.error || 'Gagal mengubah penugasan');
+      return;
     }
     closeSheet();
-    showToast('Perubahan berhasil disimpan');
+    showToast('Penugasan berhasil disimpan');
   };
 
   const useAiDraft = (text: string) => {
@@ -201,14 +183,14 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
             <>
               <ProgressSummaryCard
                 service={service}
-                stageStartedAt={stageTimingData.currentStageStartedAt}
-                stageDuration={stageTimingData.currentStageDuration}
-                totalDuration={stageTimingData.totalDuration}
+                stageStartedAt={timing.currentStageStartedAt}
+                stageDuration={timing.currentStageDuration}
+                totalDuration={timing.totalDuration}
               />
               <Button label="Perbarui Tahap" icon="create-outline" onPress={() => setSheet('stage')} />
               <AssignmentCard
                 service={service}
-                supportName={supportStaffName}
+                supportName={service.supportStaffName ?? '—'}
                 canEdit={canAssignService(actor)}
                 onEdit={() => setSheet('assignment')}
               />
@@ -220,8 +202,8 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
             <WorkflowCard
               currentStage={service.currentStage}
               activities={serviceActivities}
-              startedAt={stageTimingData.currentStageStartedAt}
-              completedAt={stageTimingData.completedStageAt}
+              startedAt={timing.currentStageStartedAt}
+              completedAt={timing.completedStageAt}
             />
           ) : null}
 
@@ -248,6 +230,7 @@ export function ServiceDetailScreen({ serviceId, onBack }: ServiceDetailScreenPr
       <AssignmentSheet
         visible={sheet === 'assignment'}
         service={service}
+        staffList={activeStaff}
         onClose={closeSheet}
         onSave={saveAssignment}
       />
