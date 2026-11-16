@@ -16,7 +16,7 @@ Tugas ini menyiapkan proses autentikasi aplikasi NotarisAI menggunakan Supabase 
 
 ### 2.1 Login email dan kata sandi ###
 
-[gif]
+![alt text](login-akun-google.gif)
 
 ### 2.2 Login Google (OAuth) ###
 Alur: tombol "Masuk dengan Google" membuka browser, pengguna memilih akun, Google mengembalikan pengguna ke aplikasi, lalu Supabase membuat sesi.
@@ -24,7 +24,7 @@ Alur: tombol "Masuk dengan Google" membuka browser, pengguna memilih akun, Googl
 ### 2.2.1 Dengan Akun yang sudah terdaftar ###
 ![alt text](oauth-akun.gif)
 
-### 2.2.1 Dengan Akun yang sudah terdaftar ###
+### 2.2.1 Dengan Akun yang tidak terdaftar ###
 ![alt text](oauth-tdk-akun.gif)
 Pengguna baru dari Google muncul di Authentication > Users dan tabel `profiles`:
 
