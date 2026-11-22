@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -425,6 +426,7 @@ export function ReportsScreen({ onOpenRepertorium, onOpenPratinjau }: ReportsScr
         />
         <LaporanHeader progress={summary.progress} />
         <StatsRow {...summary.stats} />
+        <Button label="Eksperimen prediksi akta · Offline" variant="outline" onPress={() => router.push('/eksperimen-ai')} />
 
         <View style={styles.sectionHeader}>
           <AppText variant="title" accessibilityRole="header">

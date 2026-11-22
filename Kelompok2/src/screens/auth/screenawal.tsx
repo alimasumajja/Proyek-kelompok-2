@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, StatusBar, ActivityIndicator, Platform } from '
 import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/atoms';
 
 export default function SplashScreen() {
   const { user, loading } = useAuth();
@@ -26,6 +27,7 @@ export default function SplashScreen() {
       </View>
       <View style={styles.bottomContainer}>
         <ActivityIndicator size="large" color="#D4AF37" />
+        <Button label="Eksperimen AI offline" onPress={() => router.replace('/eksperimen-ai')} />
       </View>
     </View>
   );
@@ -63,7 +65,8 @@ const styles = StyleSheet.create({
   logoTextBold: { fontWeight: 'bold', color: '#D4AF37' },
   subtitle: { color: '#a0a0a0', fontSize: 14, marginTop: 8 },
   bottomContainer: {
-    height: 52,
+    minHeight: 100,
+    gap: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,

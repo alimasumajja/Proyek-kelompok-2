@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleIcon } from '@/components/atoms/GoogleIcon';
+import { Button } from '@/components/atoms/Button';
 import { getAuthFeedback, type AuthFeedback } from '@/utils/auth-errors';
 
 export default function LoginScreen() {
@@ -107,6 +108,7 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.formContainer}>
+          <Button label="Coba eksperimen AI offline" variant="outline" onPress={() => router.replace('/eksperimen-ai')} />
           {feedback ? (
             <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
               <Feather name="info" size={18} color={NotaryColors.danger} style={{ marginTop: 2 }} />
