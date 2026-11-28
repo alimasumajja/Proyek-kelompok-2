@@ -426,7 +426,7 @@ export function ReportsScreen({ onOpenRepertorium, onOpenPratinjau }: ReportsScr
         />
         <LaporanHeader progress={summary.progress} />
         <StatsRow {...summary.stats} />
-        <Button label="Eksperimen prediksi akta · Offline" variant="outline" onPress={() => router.push('/eksperimen-ai')} />
+        <Button label="Prediksi Akta AI · On-Device" variant="outline" onPress={() => router.push('/eksperimen-ai')} />
 
         <View style={styles.sectionHeader}>
           <AppText variant="title" accessibilityRole="header">

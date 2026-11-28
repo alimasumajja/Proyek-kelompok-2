@@ -16,7 +16,6 @@ import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleIcon } from '@/components/atoms/GoogleIcon';
-import { Button } from '@/components/atoms/Button';
 import { getAuthFeedback, type AuthFeedback } from '@/utils/auth-errors';
 
 export default function LoginScreen() {
@@ -108,7 +107,6 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.formContainer}>
-          <Button label="Coba eksperimen AI offline" variant="outline" onPress={() => router.replace('/eksperimen-ai')} />
           {feedback ? (
             <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
               <Feather name="info" size={18} color={NotaryColors.danger} style={{ marginTop: 2 }} />
@@ -229,6 +227,20 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
           <Text style={styles.accountHint}>Gunakan email yang sudah didaftarkan oleh Notaris.</Text>
+
+          <TouchableOpacity
+            style={styles.aiShortcut}
+            onPress={() => router.push('/eksperimen-ai')}
+            disabled={isDisabled}
+            accessibilityRole="button"
+            accessibilityLabel="Buka Prediksi Akta AI On-Device">
+            <Feather name="cpu" size={16} color={NotaryColors.emerald} />
+            <View style={styles.aiShortcutTexts}>
+              <Text style={styles.aiShortcutTitle}>Prediksi Akta AI (On-Device)</Text>
+              <Text style={styles.aiShortcutSub}>Dapat diakses tanpa koneksi internet</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -346,6 +358,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   accountHint: { color: NotaryColors.badgeNeutralText, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 12 },
+  aiShortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: NotaryColors.border,
+    backgroundColor: NotaryColors.background,
+  },
+  aiShortcutTexts: { flex: 1, gap: 1 },
+  aiShortcutTitle: { color: NotaryColors.textPrimary, fontSize: 13, fontWeight: '600' },
+  aiShortcutSub: { color: NotaryColors.textSecondary, fontSize: 11 },
   googleButtonText: {
     color: '#1F1F1F',
     fontSize: 14,

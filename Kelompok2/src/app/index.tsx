@@ -23,7 +23,7 @@ export default function IndexScreen() {
         gap: 24,
       }}>
       <ActivityIndicator size="large" color="#17352D" />
-      <Button label="Eksperimen AI offline" onPress={() => router.replace('/eksperimen-ai')} />
+      <Button label="Prediksi Akta AI (On-Device)" onPress={() => router.replace('/eksperimen-ai')} />
     </View>
   );
 }

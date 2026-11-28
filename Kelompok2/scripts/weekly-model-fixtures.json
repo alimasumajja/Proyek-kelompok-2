@@ -6,7 +6,10 @@
       0,
       0
     ],
-    "expected": 2.310126063299703
+    "expected": 0.8919340021571558,
+    "expectedNumpy": 0.8919339542171059,
+    "naiveBaseline": 0,
+    "ma4Baseline": 0.0
   },
   {
     "input": [
@@ -15,7 +18,10 @@
       3,
       4
     ],
-    "expected": 2.9719630989375307
+    "expected": 1.2533130339215215,
+    "expectedNumpy": 1.2533130618282642,
+    "naiveBaseline": 4,
+    "ma4Baseline": 2.5
   },
   {
     "input": [
@@ -24,7 +30,22 @@
       2,
       1
     ],
-    "expected": 2.7521747238698553
+    "expected": 1.189144055872514,
+    "expectedNumpy": 1.1891441146383852,
+    "naiveBaseline": 1,
+    "ma4Baseline": 2.5
+  },
+  {
+    "input": [
+      2,
+      1,
+      2,
+      3
+    ],
+    "expected": 1.626118371698991,
+    "expectedNumpy": 1.6261183802784647,
+    "naiveBaseline": 3,
+    "ma4Baseline": 2.0
   },
   {
     "input": [
@@ -33,15 +54,21 @@
       11,
       11
     ],
-    "expected": 4.738674594957258
+    "expected": 1.943075892739798,
+    "expectedNumpy": 1.943076150428786,
+    "naiveBaseline": 11,
+    "ma4Baseline": 11.0
   },
   {
     "input": [
-      100,
-      100,
-      100,
-      100
+      25,
+      25,
+      25,
+      25
     ],
-    "expected": 24.38783998745929
+    "expected": 2.376841349595776,
+    "expectedNumpy": 2.3768413451069788,
+    "naiveBaseline": 25,
+    "ma4Baseline": 25.0
   }
 ]

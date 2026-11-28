@@ -1,0 +1,237 @@
+{
+  "schemaVersion": "1.0",
+  "modelVersion": "tflite-log1p-ridge-regular-v2",
+  "generatedFrom": {
+    "sourceSha256": "7736d6bce29b5f9cd779f0efd42ede671bed595bd259be8490ed8d2616580149",
+    "totalDeedsInCsv": 114,
+    "totalDeedsIn42FullWeeks": 111,
+    "regularDeedsIn42FullWeeks": 69,
+    "batchPersonalGuaranteeTotal": 42,
+    "boundaryDeedsExcluded": 3,
+    "piiStoredInArtifacts": false
+  },
+  "chronologicalSplit": {
+    "totalFullWeeks": 42,
+    "lags": 4,
+    "totalSupervisedPairs": 38,
+    "train": {
+      "pairs": 22,
+      "start": "2026-02-02",
+      "end": "2026-06-29"
+    },
+    "validation": {
+      "pairs": 8,
+      "start": "2026-07-06",
+      "end": "2026-08-24"
+    },
+    "testHoldout": {
+      "pairs": 8,
+      "start": "2026-08-31",
+      "end": "2026-10-19"
+    },
+    "strictFeaturization": "Standardization (mean, scale) fit only on training partition before evaluating val/test."
+  },
+  "primaryTaskRegularDeeds": {
+    "description": "Prediksi jumlah akta reguler/organik mingguan (PT, CV, Firma, RUPS, Perjanjian) di luar proyek batch korporat Personal Guarantee.",
+    "selectedModel": "log1p_ridge_alpha_1",
+    "validationFromTrainOnly": {
+      "baselines": {
+        "naive_lag1": {
+          "mae": 2.875,
+          "rmse": 3.9843
+        },
+        "ma4": {
+          "mae": 1.9375,
+          "rmse": 2.3049
+        },
+        "median4": {
+          "mae": 1.75,
+          "rmse": 1.9365
+        },
+        "train_mean": {
+          "mae": 1.25,
+          "rmse": 1.4806
+        },
+        "train_median": {
+          "mae": 1.25,
+          "rmse": 1.6583
+        }
+      },
+      "models": {
+        "log1p_ridge_alpha_1": {
+          "mae": 0.9325,
+          "rmse": 1.2169
+        },
+        "log1p_ridge_alpha_10": {
+          "mae": 1.0654,
+          "rmse": 1.3667
+        },
+        "ridge_alpha_10": {
+          "mae": 1.6984,
+          "rmse": 2.2454
+        },
+        "ridge_alpha_100": {
+          "mae": 1.2889,
+          "rmse": 1.6259
+        }
+      }
+    },
+    "testHoldoutFromTrainOnly": {
+      "models": {
+        "log1p_ridge_alpha_1": {
+          "mae": 0.789,
+          "rmse": 0.87
+        },
+        "log1p_ridge_alpha_10": {
+          "mae": 0.8983,
+          "rmse": 1.053
+        },
+        "ridge_alpha_10": {
+          "mae": 0.7414,
+          "rmse": 0.8666
+        },
+        "ridge_alpha_100": {
+          "mae": 0.7007,
+          "rmse": 0.8884
+        }
+      }
+    },
+    "testHoldoutFinalBundledModel": {
+      "trainedOn": "train_plus_validation_30_pairs",
+      "baselines": {
+        "naive_lag1": {
+          "mae": 0.875,
+          "rmse": 1.2748
+        },
+        "ma4": {
+          "mae": 1.0938,
+          "rmse": 1.2343
+        },
+        "median4": {
+          "mae": 1.25,
+          "rmse": 1.3919
+        },
+        "train_mean": {
+          "mae": 0.875,
+          "rmse": 1.0677
+        },
+        "train_median": {
+          "mae": 0.875,
+          "rmse": 1.3693
+        }
+      },
+      "numpyModel": {
+        "mae": 0.5543,
+        "rmse": 0.6927
+      },
+      "tfliteBundledModel": {
+        "mae": 0.5543,
+        "rmse": 0.6927
+      },
+      "beatsAllBaselinesOnTest": true
+    }
+  },
+  "transparentBenchmarkAllDeeds": {
+    "description": "Evaluasi jujur pada 100% seluruh akta (termasuk lonjakan 27 akta batch Personal Guarantee pada Oktober 2026 dari 1 klien korporat).",
+    "regimeShiftNote": "Rata-rata mingguan melonjak dari 2.14 (Train) dan 1.88 (Val) menjadi 5.75 (Test) akibat batch Personal Guarantee di Oktober.",
+    "validationFromTrainOnly": {
+      "baselines": {
+        "naive_lag1": {
+          "mae": 2.625,
+          "rmse": 3.9211
+        },
+        "ma4": {
+          "mae": 2.0,
+          "rmse": 2.4812
+        },
+        "median4": {
+          "mae": 2.0,
+          "rmse": 2.2638
+        },
+        "train_mean": {
+          "mae": 1.1932,
+          "rmse": 1.3884
+        },
+        "train_median": {
+          "mae": 1.125,
+          "rmse": 1.6202
+        }
+      },
+      "models": {
+        "ridge_alpha_100_legacy": {
+          "mae": 1.1681,
+          "rmse": 1.2906
+        },
+        "delta_ridge_alpha_200": {
+          "mae": 2.5274,
+          "rmse": 3.7748
+        }
+      }
+    },
+    "testHoldoutRefitTrainVal": {
+      "baselines": {
+        "naive_lag1": {
+          "mae": 1.625,
+          "rmse": 1.9685
+        },
+        "ma4": {
+          "mae": 2.4688,
+          "rmse": 2.9115
+        },
+        "median4": {
+          "mae": 2.4375,
+          "rmse": 2.9843
+        },
+        "train_mean": {
+          "mae": 3.9667,
+          "rmse": 4.7439
+        },
+        "train_median": {
+          "mae": 4.75,
+          "rmse": 5.6125
+        }
+      },
+      "models": {
+        "ridge_alpha_100_legacy": {
+          "mae": 4.0229,
+          "rmse": 4.831
+        },
+        "delta_ridge_alpha_200": {
+          "mae": 1.6372,
+          "rmse": 1.9934
+        }
+      }
+    }
+  },
+  "tfliteExportAndQuantization": {
+    "selectedVariant": "fp32",
+    "reason": "Ukuran model FP32 sudah sangat kecil (<3 KB), kompatibel penuh dengan TFLite builtin ops, dan mempertahankan presisi numerik terbaik.",
+    "maxParityDiffOnFixtures": 2.6e-07,
+    "variants": {
+      "fp32": {
+        "sizeBytes": 1120,
+        "testMetrics": {
+          "mae": 0.5543,
+          "rmse": 0.6927
+        },
+        "maxAbsDiffVsNumpy": 3.9e-07
+      },
+      "fp16": {
+        "sizeBytes": 1528,
+        "testMetrics": {
+          "mae": 0.5543,
+          "rmse": 0.6928
+        },
+        "maxAbsDiffVsNumpy": 0.00055388
+      },
+      "int8_dynamic": {
+        "sizeBytes": 1616,
+        "testMetrics": {
+          "mae": 0.5537,
+          "rmse": 0.6938
+        },
+        "maxAbsDiffVsNumpy": 0.00776294
+      }
+    }
+  }
+}

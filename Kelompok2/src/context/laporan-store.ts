@@ -174,14 +174,18 @@ async function muatKonfirmasi() {
 }
 
 /** Muat ulang seluruh data. Dipanggil otomatis saat login; boleh dipanggil manual (tarik-segarkan). */
-export async function muatSemua() {
+export async function muatSemua(opsi?: { senyap?: boolean }) {
   emit({ memuat: true });
   try {
     await Promise.all([muatAkta(), muatDokumen(), muatKonfirmasi(), muatPengaturan()]);
     emit({ memuat: false, dimuat: true });
   } catch (error) {
     emit({ memuat: false });
-    lapor('Gagal memuat data laporan', error);
+    if (opsi?.senyap) {
+      console.warn('[laporan] Pemuatan latar belakang dilewati (offline/jaringan):', error);
+    } else {
+      lapor('Gagal memuat data laporan', error);
+    }
   }
 }
 
@@ -198,7 +202,8 @@ supabase.auth.onAuthStateChange((event, session) => {
   if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && id && id !== penggunaTermuat) {
     penggunaTermuat = id;
     // Jangan memanggil Supabase langsung di dalam callback ini (bisa menggantung).
-    setTimeout(() => void muatSemua(), 0);
+    // Gunakan mode senyap agar tidak memunculkan pop-up Alert saat aplikasi dibuka dalam mode offline.
+    setTimeout(() => void muatSemua({ senyap: true }), 0);
   }
 });
 

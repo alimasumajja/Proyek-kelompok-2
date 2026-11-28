@@ -1,65 +1,117 @@
-# Konteks Proyek — NotarisAI (aplikasi mobile)
+# Konteks Proyek — NotarisAI (Aplikasi Mobile)
 
-> Berkas ini adalah "ingatan" proyek untuk Claude Project. Bacalah sebelum menulis atau mengubah kode.
-> Kondisi: awal November 2026, acuan `main` commit `3e6b93b`. Bagian "Belum selesai" bisa sudah berubah; periksa dulu.
+> Berkas ini adalah rujukan konteks teknis dan bisnis proyek NotarisAI. Bacalah sebelum menulis atau mengubah kode, lalu tetap validasikan terhadap source code aktual dan skema Supabase remote.
+> **Kondisi pembaruan:** 28 November 2026 — acuan branch aktif `feat/offline-weekly-forecast` (`ce09f6a`, sudah menggabungkan `origin/main` commit `6f974e9`) dan verifikasi langsung proyek Supabase remote `krzyuwzyuzlmvsgdfzij`.
 
-## 1. Tujuan aplikasi
-NotarisAI membantu **satu kantor notaris** memantau pekerjaan hariannya: layanan yang masuk, siapa penanggung jawab, tahap dan progres (8 tahap), kendala, riwayat perubahan, laporan bulanan, dan repertorium. Pengguna: **Notaris** (pemilik, melihat semua) dan **Staf** (pelaksana, hanya melihat layanan yang ditugaskan kepadanya).
+## 1. Tujuan Aplikasi & Ruang Lingkup MVP
 
-**Di luar lingkup MVP (PRD §5.2):** unggah dokumen/lampiran, OCR, portal klien, pembayaran, multi-kantor. Semua data dimasukkan lewat formulir teks.
-**Acuan utama:** `PRD_NotarisAI_Revisi_MVP.md` dan desain Figma Make (`AppReference.txt`, gambar `NotarisAI_Desain`). Jika usulan bertentangan dengan PRD, tunjukkan pertentangannya dan jangan diam-diam menyimpang.
+NotarisAI adalah aplikasi mobile manajemen operasional untuk **satu kantor notaris** guna menggantikan pemantauan progres manual lewat WhatsApp/lisan. Aplikasi membantu memantau layanan masuk, penanggung jawab, progres 8 tahap, durasi pengerjaan, kendala, riwayat audit, notifikasi dalam aplikasi, pencatatan repertorium terstruktur, serta penyusunan, persetujuan, dan ekspor laporan bulanan (format MPDN).
 
-## 2. Teknologi dan standar
-- Expo **SDK 58** (expo 58.0.x), React Native 0.88, React 19.3, TypeScript, **Expo Router** (typed routes), folder `Kelompok2/`, alias impor `@/` → `src/`.
-- Data masih **dummy di memori** (hilang saat aplikasi ditutup). Backend rencana: Supabase. Asisten AI masih **simulasi lokal**.
-- Bahasa antarmuka dan komentar kode: **Bahasa Indonesia**.
-- Pemeriksaan wajib sebelum menyatakan selesai: `npx tsc --noEmit`, `npx expo lint`, `npx expo export --platform android`. Jangan mengklaim sudah diuji di HP bila belum.
-- Tipe rute dibuat saat `npx expo start`. Bila `tsc` menampilkan puluhan galat rute: hapus `.expo`, jalankan `npx expo start` sekali, lalu `tsc` lagi.
-- Windows: letakkan proyek **di luar OneDrive** dan di jalur tanpa spasi (mis. `C:\dev\notaris`). `node_modules` di OneDrive pernah rusak.
-- Perubahan dikirim sebagai patch (`git apply --check` dahulu; bila dokumen berbeda pakai `--exclude=PerbaikanUTS.md`). Jangan memakai `git add -A`; tambahkan per jalur.
+- **Pengguna:** **Notaris** (pemilik kantor: melihat seluruh layanan, mengelola jenis layanan, mengelola akun staf, menyetujui/meminta revisi laporan) dan **Staf** (pelaksana: hanya melihat dan mengerjakan layanan yang ditugaskan kepadanya, mencatat layanan baru, serta membantu pencatatan repertorium/laporan).
+- **Di luar ruang lingkup MVP (PRD §5.2):** unggah dokumen/lampiran, penyimpanan file, OCR, portal klien, pembayaran/invoice, integrasi WhatsApp/tanda tangan elektronik, dan dukungan multi-kantor. Semua informasi operasional dicatat lewat formulir teks terstruktur.
+- **Acuan utama:** `PRD_NotarisAI_Revisi_MVP.md` dan desain Figma Make (`AppReference.txt`). Jika ada kebutuhan yang bertentangan dengan PRD, sampaikan konflik tersebut terlebih dahulu.
 
-## 3. Struktur folder dan pola (`Kelompok2/src`)
-- `app/` = **route saja** (tipis): baca parameter, tentukan navigasi. Layar sebenarnya ada di `screens/`.
-- `screens/<area>/` = tampilan + logika halaman: `home`, `services`, `reports`, `profile`, `notifications`, `auth`.
-- `components/` = **atomic design**: `atoms` (AppText, Button, Badge, Avatar, Chip, Input, IconButton, ProgressBar), `molecules` (ServiceCard, SearchBar, SelectField, DatePickerField, SegmentedControl, BottomSheet, FormField, InfoNote, EmptyState, dll.), `organisms` (AppHeader, BottomNavBar, HomeHeader, SummaryGrid, sheet-sheet).
-- `context/` = state bersama: `service-store` (layanan, catatan, riwayat, notifikasi, jenis layanan), `profile-store` (akun aktif, daftar staf), `toast`, `laporan-store`, `AuthContext` (lihat bagian 8).
-- `hooks/` (`use-session`, `use-service-filters`, `use-status-bar-style`), `utils/` (fungsi murni: `permissions`, `service`, `service-workflow`, `service-types`, `date`, `activity`), `constants/` (tema Manrope, tahap, tipografi), `types/`, `data/dummy.ts`.
-- Navigasi: Stack di root; tab **Beranda, Layanan, Tambah (tombol tengah), Laporan, Profil** via `BottomNavBar` kustom. Halaman turunan **di luar tab** (bottom nav tersembunyi): `/layanan/[id]`, `/notifikasi`, `/jenis-layanan`, `/laporan/repertorium`, `/laporan/pratinjau`, `/profile/staf`.
-- Jangan menduplikasi komponen. Pakai ulang atom/molecule yang ada (mis. `PickerField` dan `DateInputField` kini hanya pembungkus `SelectField` dan `DatePickerField`).
+## 2. Teknologi, Dependencies & Standar Proyek
 
-## 4. Aturan bisnis yang sudah diputuskan
-- **8 tahap layanan** (PRD §6.4): Penerimaan Berkas, Verifikasi Dokumen, Penyusunan Draf, Penyelesaian Draf, Revisi Draf, Pelaksanaan Akad, Proses Pendaftaran, Penerbitan dan Penyerahan Hasil.
-- **Progres** = nomor tahap ÷ 8 (mengikuti Figma). Revisi diulang tidak menambah progres. "Lewati Proses Pendaftaran" wajib alasan. Semua perubahan tercatat di Riwayat. (PRD §16 menyarankan "tahap selesai ÷ 8"; masih terbuka.)
-- **Akses data:** Notaris melihat semua layanan; **Staf hanya layanan yang ditugaskan kepadanya** (keputusan tim). Berlaku di Beranda, Layanan, Detail (akses langsung ditolak), dan Notifikasi. Semua pengecekan lewat `utils/permissions.ts`; layar tidak boleh menulis `role === 'Notaris'` sendiri.
-- **Izin:** ubah penanggung jawab/target, kelola jenis layanan, setujui laporan, kelola staf = **hanya Notaris**. Perbarui tahap dan tambah catatan = Notaris, atau Staf pada layanannya sendiri.
-- **Ringkasan Beranda dihitung dari data yang sama dengan daftar Layanan.** Aktif = status Aktif + Perlu Perhatian; Terlambat; Selesai (label "Total"); Perlu Perhatian (bagian dari Aktif). Angka kartu harus sama dengan jumlah hasil saat kartu diketuk.
-- **Dashboard Staf** berbeda dari Notaris: sapaan nama akun aktif, ringkasan hanya miliknya, aksi cepat (Catat Layanan, Semua Tugas), Perlu Tindakan, Sedang Dikerjakan, Target Terdekat, Aktivitas Saya.
-- **Notifikasi lintas peran:** Staf mencatat *Kendala* → Notaris diberi tahu; Staf pindah ke *Penyelesaian Draf* → Notaris diberi tahu; Notaris menugaskan/mengganti penanggung jawab → staf baru diberi tahu; layanan baru ditugaskan ke staf lain → staf itu diberi tahu.
-- **Jenis layanan = data yang dikelola Notaris (CRUD):** tambah (nama unik, maks. 60 karakter), ubah nama (layanan lama ikut berubah), nonaktifkan (tak muncul di formulir Tambah, layanan lama utuh), hapus (hanya bila belum dipakai).
-- **Tanggal** memakai kalender native (`DatePickerField`), nilai string `HH-BB-TTTT`. Target kosong disimpan `'-'` (`NO_DUE_DATE`) dan ditampilkan "Belum ditentukan".
-- **Layar Layanan:** judul di tengah, **tanpa tombol "+"** (menu Tambah sudah di bottom nav). **Filter** (tab, kata kunci, tahap, staf, prioritas; lencana jumlah aktif; "Hapus filter") dan **Urut prioritas** (sakelar sederhana, tanpa pop-up) adalah dua hal terpisah. Kartu layanan dijaga bersih: **tanpa ikon/teks prioritas tambahan**.
-- Warna tidak boleh menjadi satu-satunya pembeda status (PRD §13.3): selalu sertakan teks.
+- **Framework & Bahasa:** Expo **SDK 58** (`expo ~58.0.19`), React Native `0.88.0`, React `19.3.0`, TypeScript `~6.0.3` (`strict: true`), **Expo Router** (`~58.0.26`, `typedRoutes: true`, `reactCompiler: true`).
+- **Folder aplikasi utama:** `Kelompok2/` dengan alias impor `@/*` → `src/*` dan `@/assets/*` → `assets/*`.
+- **Backend:** Supabase (`@supabase/supabase-js ^2.119.0`), PostgreSQL + RLS, Supabase Auth (Email/Kata Sandi + Google OAuth), PostgreSQL RPC, Supabase Edge Functions, dan Supabase Realtime.
+- **Konfigurasi env publik:** `EXPO_PUBLIC_SUPABASE_URL` dan `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (tidak menyimpan `service_role` key atau password DB di aplikasi).
+- **Paket UI & Utilitas Utama:** `@expo-google-fonts/manrope`, `@expo/vector-icons`, `@react-native-community/datetimepicker`, `@react-native-async-storage/async-storage`, `expo-web-browser`, `expo-linking`, `expo-dev-client`, `expo-print`, `expo-file-system`, `expo-sharing`, `expo-clipboard`, `react-native-svg`, `react-native-reanimated`.
+- **Konfigurasi Expo & EAS (`Kelompok2/app.json`, `eas.json`):**
+  - Android package: `id.notarisai.kelompok2`, scheme deep link: `kelompok2` (`kelompok2://auth/callback`).
+  - EAS project owner: `novaladriann` (`Kelompok2`).
+  - Profil build EAS: `development` (APK `expo-dev-client`, distribusi internal, butuh Metro via `npm run start:dev` — digunakan untuk uji Google OAuth Android) dan `preview` (APK internal standalone tanpa Metro — ditambahkan pada branch `feat/offline-weekly-forecast` untuk uji offline).
+- **Bahasa antarmuka & komentar kode:** Bahasa Indonesia.
+- **Pemeriksaan wajib (di folder `Kelompok2/`):** `npx tsc --noEmit`, `npx expo lint`, tes otomatis (`npm run test:oauth`, `npm run test:forecast`), dan `npx expo export --platform android` bila relevan. Pada Windows dengan keterbatasan memori, jalankan berurutan atau dengan `--max-workers 1`.
+- **Catatan lingkungan Windows:** Jangan letakkan repo di dalam OneDrive. Jalur tanpa spasi lebih direkomendasikan bila menemui kendala tooling CLI.
+- **Tipe rute Expo Router:** Jika `tsc` gagal pada tipe rute, regenerasi `.expo/types` lewat `npx expo start` sekali lalu ulangi `tsc`.
 
-## 5. Data demo
-- Layanan: LAY-2026-0021 (Andi, Aktif, Sedang), 0022 (Rina, Perlu Perhatian, Tinggi, ada Kendala), 0023 (Andi, Terlambat, Tinggi), 0024 (Rina, Selesai, Rendah).
-- Akun demo: `nadia` / `notaris123` (Notaris), `andi` / `staf123`, `rina` / `staf123`, `dewi` (Nonaktif). Peran bisa diganti lewat Profil → Mode Demo.
+## 3. Struktur Folder & Arsitektur (`Kelompok2/src/`)
 
-## 6. Pembagian pekerjaan (berdasarkan riwayat Git)
-- **Noval:** Beranda dan Dashboard Staf, Layanan, Detail Layanan, Notifikasi, Jenis Layanan, bottom nav, `permissions`/`use-session`; implementasi Google OAuth, integrasi login Google Android, development build, dan revisi UX login (konfirmasi 2026-11-15).
-- **Aji:** halaman Tambah Layanan. **Avis:** Profil dan Manajemen Staf. **Amam:** Laporan, Repertorium, Pratinjau/persetujuan/ekspor. **Ali:** Login/Splash, perapian struktur folder, `AuthContext`.
-- Pembagian Ali di atas merujuk modul autentikasi awal; pekerjaan Google OAuth dikerjakan oleh **Noval**, bukan Ali.
-- **Jangan mengubah berkas milik anggota lain tanpa menandainya** dan menyiapkan perubahan sebagai usulan terpisah untuk pemiliknya.
+- `app/` — **route tipis saja** (Expo Router):
+  - Root: `_layout.tsx` (font Manrope, provider stack: `ServiceStoreProvider` → `AuthProvider` → `ProfileStoreProvider` → `ToastProvider`), `index.tsx`, `screenawal.tsx`, `login.tsx`, `auth/callback.tsx`, `eksperimen-ai.tsx`.
+  - Grup tab `(tabs)/`: `_layout.tsx` (guard auth + `BottomNavBar` 5 menu: Beranda, Layanan, Tambah, Laporan, Profil), `index.tsx`, `layanan.tsx`, `tambah.tsx`, `laporan.tsx`, `profil.tsx`.
+  - Rute turunan di luar tab (tanpa bottom nav): `layanan/[id].tsx`, `notifikasi.tsx`, `jenis-layanan.tsx`, `laporan/repertorium.tsx`, `laporan/pratinjau.tsx`, `profile/staf.tsx`.
+- `screens/` — implementasi layar per domain: `auth/` (`screenawal`, `LoginScreen`, `OAuthCallbackScreen`), `home/` (`HomeScreen`, `StaffDashboard`), `services/` (`LayananScreen`, `ServiceDetailScreen`, `ServiceTypesScreen`, `TambahLayananScreen`), `notifications/` (`NotificationsScreen`), `reports/` (`ReportsScreen`, `RepertoriumScreen`, `ReportPreviewScreen`), `profile/` (`ProfileScreen`, `StaffManagementScreen`), `ai/` (`WeeklyForecastScreen` — pada branch `feat/offline-weekly-forecast`).
+- `components/` — mengikuti Atomic Design (`atoms/`, `molecules/`, `organisms/`) + folder khusus domain `laporan/` (sheet/kertas laporan) dan folder legacy `profil/` (belum terpakai aktif oleh layar saat ini).
+- `context/` — state bersama:
+  - `AuthContext.tsx`: autentikasi Supabase (Email/Password + Google OAuth Web & Native), validasi whitelist profil aktif + pencocokan email terdaftar, logout, cek status aktif via `AppState` & langganan profil.
+  - `service-store.tsx`: data `services`, `service_types`, `activeStaff`, `notes`, `activities`, `serviceTiming`, `notifications` (termasuk Realtime channel `notifications`), serta mutasi ke Supabase/RPC.
+  - `profile-store.tsx`: daftar profil kantor, daftar staf, preferensi notifikasi, serta aksi `create-staff` dan `manage-staff` via Edge Functions.
+  - `laporan-store.ts`: external store (`useSyncExternalStore`) tanpa Provider untuk data `akta`, `laporan_periode`, `laporan_snapshot`, `konfirmasi_kategori`, dan `laporan_pengaturan` melalui `lib/laporan-api.ts`.
+  - `toast.tsx`: umpan balik toast global.
+- `hooks/`: `use-session.ts` (menyatukan `AuthContext`, `service-store`, dan `permissions`), `use-service-filters.ts`, `use-isi-dokumen.ts`, `use-sheet-draft.ts`, `use-status-bar-style.ts`, `use-color-scheme*.ts`, `use-theme.ts`.
+- `lib/`: `supabase.ts` (klien Supabase dengan `AsyncStorage` mobile / `localStorage` web & `detectSessionInUrl: Platform.OS === 'web'`), `laporan-api.ts`, serta file legacy `account-registry.ts` (tidak lagi diimpor oleh alur aktif).
+- `utils/`: `permissions.ts`, `service.ts`, `service-workflow.ts`, `service-types.ts`, `date.ts`, `activity.ts`, `oauth.ts`, `auth-errors.ts`, `laporan-export.ts`, `laporan-pengaturan.ts`, `laporan-surat.ts`, `laporan-template.ts`, `weekly-forecast.ts` (di branch eksperimen).
+- `constants/`: `notary-theme.ts` (`FigmaTokens`, `NotaryColors`, `Radius`, `Spacing`, `Shadow` — warna hijau tua `#173f35`, emerald `#2f6b57`, emas `#c5a46d`, krem `#f7f8f5`, font Manrope), `service.ts`, `typography.ts`, `theme.ts`, serta file legacy `profile-store.tsx`.
+- `types/`: `service.ts`, `profile.ts`, `laporan.ts`, `declarations.d.ts`.
 
-## 7. Cara bekerja yang diharapkan
-- Sebelum mengubah, baca kode terbaru (`main`), jangan menebak. Jelaskan sebab masalah, buktikan (tes/`tsc`), baru perbaiki.
-- Bukti uji disimpan dalam `PerbaikanUTS.md`. Tes (Jest + RNTL) dijalankan sementara dengan `npm i --no-save`, tidak dimasukkan ke repo.
-- Tampilan harus **bersih dan profesional**, tidak ramai; hindari penambahan ikon/teks yang tidak perlu. Utamakan komponen yang sudah ada dan token tema (`NotaryColors`, `Typography`, `Radius`, `Spacing`).
-- Aksesibilitas: beri `accessibilityLabel`/`accessibilityRole`/`accessibilityState` yang bermakna.
+## 4. Aturan Bisnis & Hak Akses
 
-## 8. Belum selesai / bahan perhatian
-1. **Sesi login terpecah dua.** `AuthContext` (Ali) menyimpan `user`, tetapi akun aktif aplikasi ada di `ProfileStore` (dibaca `useSession`). `LoginScreen` hanya memanggil `AuthContext.login`, **tidak** mengatur akun aktif. Terbukti lewat tes di `main`: login sebagai Staf membuat `session.isNotaris === true` (data dan izin tetap sebagai Notaris, termasuk tombol Setujui Laporan milik Amam), dan `StaffDashboard` **crash** (`user.name` pada `null`). Perbaikan yang dirancang: `LoginScreen` memanggil `switchAccount(matchedUser.id)`; `StaffDashboard`/route Beranda memakai `useSession` saja dan debug `console.log` dibuang. Status: sedang dikerjakan; periksa apakah sudah diterapkan.
-2. **Layar Tambah belum membaca jenis layanan aktif.** Masih daftar tetap `SERVICE_TYPES`, sehingga jenis yang dinonaktifkan tetap muncul. Perbaikan: pakai `activeServiceTypeNames` dari `service-store`. Status: sedang dikerjakan. Usulan tambahan untuk layar Tambah: penanggung jawab Staf dikunci ke dirinya, anti simpan ganda, keyboard kolom kontak, tanggal target tidak boleh sebelum tanggal diterima.
-3. Pertanyaan terbuka PRD §16: Staf melihat semua atau hanya yang ditugaskan (kini diputuskan: hanya yang ditugaskan), siapa yang boleh konfirmasi penyelesaian, tahap yang boleh dilewati, definisi "Perlu Perhatian", rumus persentase progres.
-4. Hak akses baru di sisi tampilan. PRD §6.1 mewajibkan penegakan di backend (mis. Supabase RLS).
-5. Data baru dari Tambah (`receivedDate`, `clientContact`, `description`) belum ditampilkan di Detail. Tahun pada nomor layanan diambil dari tanggal diterima sedangkan urutannya global.
-6. Pengujian tampilan di HP baru dilakukan Noval sebagian (Beranda Staf, Layanan); kalender, Jenis Layanan, dan layar Laporan baru belum diperiksa di perangkat.
+- **8 Tahap Layanan (PRD §6.4):**
+  1. Penerimaan Berkas
+  2. Verifikasi Dokumen
+  3. Penyusunan Draf
+  4. Penyelesaian Draf
+  5. Revisi Draf (dapat berulang; tidak menambah persentase progres)
+  6. Pelaksanaan Akad
+  7. Proses Pendaftaran (dapat dilewati bila jenis layanan mengizinkan; wajib alasan dan tercatat di riwayat)
+  8. Penerbitan dan Penyerahan Hasil
+- **Rumus Progres:** `(indeks tahap + 1) ÷ 8 × 100%` (terpusat di `utils/service-workflow.ts`). Keterlambatan dan kendala tidak otomatis mengubah tahap/progres.
+- **Status Layanan di UI:** `Selesai`, `Dibatalkan`, `Ditunda`, `Terlambat` (aktif + melewati `target_date`), `Perlu Perhatian` (aktif + tidak terlambat + ada catatan `obstacle` atau sedang di tahap `Revisi Draf`), dan `Aktif`.
+- **Akses Data & Izin (`utils/permissions.ts` + RLS Supabase):**
+  - Notaris melihat seluruh layanan kantor; Staf hanya melihat layanan yang ditugaskan kepadanya (`service_members`).
+  - Kelola jenis layanan, ubah penanggung jawab/target, kelola akun staf, setujui/minta revisi laporan = **hanya Notaris**.
+  - Tambah layanan, perbarui tahap, tambah catatan, dan kelola repertorium (selama periode belum Final) = Notaris dan Staf sesuai penugasan/RLS.
+- **Ringkasan Beranda:** dihitung dari sumber data yang sama dengan layar Layanan (`Aktif` mencakup `Aktif` + `Perlu Perhatian`), dan Dashboard Staf memiliki tata letak khusus pekerjaan harian pribadi.
+- **Notifikasi Lintas Peran:** dipicu di sisi database (trigger `private.notify_*`) saat penugasan baru/berubah, catatan kendala, atau draf siap diperiksa; dikirim ke `public.notifications` dan diterima secara real-time oleh penerima (`recipient_id = auth.uid()`).
+- **Zero Public Registration & Google OAuth Whitelist:** Tidak ada pendaftaran publik. Trigger `handle_new_user` membuat baris profil default berstatus `is_active = false` (`role = 'staff'`), dan trigger `sync_profile_active_to_auth` men-ban akun nonaktif di `auth.users`. Di sisi klien, `AuthContext.tsx` juga menolak akun yang belum terdaftar, nonaktif, atau emailnya tidak cocok dengan `profiles.email`.
+- **Repertorium & Laporan Bulanan:** Periode berstatus `Final` mengunci perubahan akta dan nomor surat; persetujuan oleh Notaris menyimpan snapshot versi final (`1.0`, `2.0`, dst.) di server. Ekspor mendukung PDF (`expo-print` + simpan/bagikan) dan Word (`.doc` berbasis HTML via `expo-sharing`).
+- **Aksesibilitas & Visual:** Warna tidak boleh menjadi satu-satunya pembeda status (selalu sertakan teks); komponen memakai `accessibilityLabel`/`accessibilityRole`/`accessibilityState`.
+
+## 5. Backend & Database Aktual (Supabase `krzyuwzyuzlmvsgdfzij`)
+
+- **16 Tabel di schema `public` (seluruhnya `rls_enabled = true`):**
+  - Pengguna & Audit: `profiles`, `profile_audit_logs`, `akun` (tabel legacy, 0 policy aktif sehingga terblokir dari klien).
+  - Layanan & Notifikasi: `service_types`, `services`, `service_members`, `service_stage_history`, `service_notes`, `service_activity_logs`, `notifications`.
+  - Repertorium & Laporan: `akta`, `akta_riwayat`, `konfirmasi_kategori`, `laporan_periode`, `laporan_snapshot`, `laporan_pengaturan`.
+- **RPC Utama (`public`):**
+  - Layanan: `create_service`, `change_service_stage`, `update_service_assignment`, `set_service_status`.
+  - Staf & Audit: `manage_staff_profile`, `record_staff_created`, `cleanup_old_staff_identities`.
+  - Laporan: `next_nomor_urut`, `simpan_nomor_surat`, `setujui_laporan`, `minta_revisi`.
+- **Edge Functions Aktif di Remote:**
+  - `create-staff` (v3, `verify_jwt: true`) — source ada di `Kelompok2/supabase/functions/create-staff/index.ts`.
+  - `manage-staff` (v4, `verify_jwt: true`) — source ada di `Kelompok2/supabase/functions/manage-staff/index.ts`.
+  - `ai-assist` (v1, `verify_jwt: true`) — aktif di remote (dibuat untuk Ringkasan AI Laporan), **belum ada source code-nya di repositori lokal**.
+- **Publikasi Realtime (`supabase_realtime`):** `notifications`, `services`, `service_members`, `service_notes`, `service_stage_history`, `service_activity_logs`. *(Catatan: `profiles` saat ini belum masuk publikasi `supabase_realtime`.)*
+
+## 6. Implementasi AI & Eksperimen ML Offline
+
+1. **Asisten AI pada Detail Layanan (`AiAssistantSheet.tsx`):** masih berupa **simulasi lokal** berbasis template teks (`setTimeout` 700ms) tanpa memanggil LLM/Edge Function.
+2. **Prediksi Akta Mingguan Offline TFLite (`WeeklyForecastScreen.tsx`, `/eksperimen-ai` — di branch `feat/offline-weekly-forecast`):**
+   - Dikerjakan oleh **Noval** sebagai fitur AI on-device (offline) sesuai materi Pertemuan 11. Tidak membaca data kantor, tidak menyimpan input, dan tidak menyalin PII penghadap ke aplikasi.
+   - Menggunakan model **TensorFlow Lite (`.tflite`)** resmi (`tflite-log1p-ridge-regular-v2`, FP32, 1.120 bytes) di `src/assets/models/weekly-forecast.tflite` + metadata `weekly-forecast-meta.json` yang diekspor lewat `scripts/train_weekly_forecast.py` dengan split kronologis ketat (`22/8/8`). Bukti evaluasi lengkap & perbandingan kuantisasi tersimpan di `docs/project/metrics.json` (Holdout Test MAE `0,5543` / RMSE `0,6927`, mengalahkan seluruh baseline termasuk Naive `0,8750` dan MA-4 `1,0938`).
+   - Dijalankan secara async melalui `src/services/ai/weeklyForecastService.ts` memakai `react-native-fast-tflite@^3.0.1`, `react-native-nitro-modules@^0.37.2`, dan `expo-asset` (`file://` URI) pada build Android/iOS native, dilengkapi sinkronisasi silent Repertorium saat online + cache agregat non-PII (`AsyncStorage`) & fallback lokal aman untuk Expo Go/Web. Terverifikasi pada HP Android nyata (APK `preview` `58425046-9dfe-4ab2-9cea-4ad28e6a38b3`, 2026-11-28) berjalan baik saat **online** maupun **mode pesawat**.
+3. **Ringkasan AI pada Tab Laporan:** terdokumentasi pada `Laporan ai.md` (commit Amam di `origin/main`) dan Edge Function `ai-assist` terdeteksi di remote Supabase, tetapi **source code UI/client-nya belum tergabung ke `main` maupun branch aktif**.
+
+## 7. Pembagian Tanggung Jawab Anggota Kelompok
+
+1. **Noval Adrian:** Dashboard Notaris (`HomeScreen`), Dashboard Staf (`StaffDashboard`), Layanan (`LayananScreen`), Detail Layanan (`ServiceDetailScreen`), Notifikasi (`NotificationsScreen`), Manajemen Jenis Layanan (`ServiceTypesScreen`), navigasi & komponen terkait (`BottomNavBar`, `AppHeader`, `permissions`, `use-session`), implementasi Google OAuth & revisi UX login Android, konfigurasi Development Build Android (EAS), serta eksperimen prediksi jumlah akta offline (`/eksperimen-ai`).
+2. **Kurniawan Aji Saputra:** Halaman Tambah Layanan (`TambahLayananScreen`).
+3. **Avis Budiman Tauladani:** Halaman Profil (`ProfileScreen`) dan Manajemen Staf (`StaffManagementScreen`).
+4. **Khairul Tamam (Amam):** Halaman Laporan (`ReportsScreen`), Repertorium (`RepertoriumScreen`), Pratinjau, persetujuan, pengaturan template, dan ekspor laporan (`ReportPreviewScreen`, `laporan-store`, `laporan-api`, `components/laporan/`), serta dokumentasi/eksplorasi Ringkasan AI Laporan.
+5. **Ali Ma'sum Ajjawiyi:** Inisiasi proyek, perapian struktur folder, serta modul autentikasi awal (Splash, Login awal, `AuthContext` awal). *(Atribusi pekerjaan Google OAuth, callback native Android, dan revisi UX login adalah milik **Noval**.)*
+
+> **Aturan kolaborasi:** Jangan mengubah berkas milik anggota lain tanpa menjelaskan dependensi, alasan, dan dampaknya terlebih dahulu.
+
+## 8. Catatan Teknis, Technical Debt & Hal Terbuka
+
+1. **Sinkronisasi migrasi lokal vs remote:** 6 migrasi remote awal belum memiliki file lokal, sementara 4 file lokal (`20261114000100` s.d. `20261121000300`) tidak tercatat di riwayat migrasi remote (perubahannya sebagian diterapkan langsung ke DB). Selain itu `20261121000100_profile_audit_logs_rls.sql` mengandung syntax SQL tidak valid, dan `20261121000200_drop_akun_praktikum_policy.sql` terduplikasi di folder root `supabase/migrations/`. File `schema.sql` dan `supabase_schema.sql` di root kosong (0 byte).
+2. **Hapus Jenis Layanan (`deleteServiceType`):** belum berfungsi karena policy RLS `DELETE` pada `public.service_types` belum tersedia di Supabase.
+3. **Status Khusus Layanan (`Ditunda`/`Dibatalkan`):** RPC `set_service_status` dan method `updateStatus` sudah ada di `service-store.tsx`, tetapi belum dihubungkan ke UI `ServiceDetailScreen` / `ServiceActionsSheet`.
+4. **Realtime `profiles`:** `AuthContext.tsx` berlangganan `postgres_changes` pada `public.profiles`, namun tabel `profiles` belum masuk publikasi `supabase_realtime` (penolakan akun nonaktif saat ini mengandalkan trigger `banned_until` di `auth.users` dan pengecekan foreground `AppState`).
+5. **Dead/Legacy Code:** `src/constants/profile-store.tsx`, `src/lib/account-registry.ts`, `src/data/dummy.ts`, folder `src/components/profil/`, serta helper lokal `ACTOR_BY_ROLE` / `addNotification` / `addActivity` di `service-store.tsx` masih tertinggal dan tidak dipakai alur utama.
+6. **Konsistensi pengecekan izin di UI:** `ProfileScreen.tsx` dan `StaffManagementScreen.tsx` masih mengecek `user?.role === 'Notaris'` dan memfilter nama staf secara manual alih-alih lewat `utils/permissions.ts` / `useSession()`.
+7. **Detail kecil pada form & tampilan:** Detail Layanan belum menampilkan `receivedDate`, `clientContact`, dan `description`; form `TambahLayananScreen` (milik Aji) masih memakai `keyboardType="email-address"` untuk kontak klien dan belum memiliki pengaman anti-submit ganda.
+8. **Branch belum tergabung:** Eksperimen offline ML masih berada di branch `feat/offline-weekly-forecast` (ahead 4 commit dari remote branch-nya, dan belum di-merge ke `main`).

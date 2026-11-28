@@ -1,0 +1,60 @@
+{
+  "version": "tflite-log1p-ridge-regular-v2",
+  "format": "tflite",
+  "quantization": "fp32",
+  "tfliteSizeBytes": 1120,
+  "targetScope": "regular_organic_deeds_excluding_batch_personal_guarantee",
+  "trainedRange": {
+    "start": "2026-01-05",
+    "end": "2026-08-30",
+    "pairs": 30
+  },
+  "holdoutTestRange": {
+    "start": "2026-08-31",
+    "end": "2026-10-25",
+    "pairs": 8
+  },
+  "sourceSha256": "7736d6bce29b5f9cd779f0efd42ede671bed595bd259be8490ed8d2616580149",
+  "matchesReferenceDataset": false,
+  "lags": 4,
+  "alpha": 1.0,
+  "transform": "log1p_standardize_expm1",
+  "inputOrder": "oldest-to-newest",
+  "coefficientOrder": "newest-to-oldest",
+  "mean": [
+    0.7198017208798643,
+    0.6966968148611995,
+    0.6966968148611995,
+    0.7062862172762588
+  ],
+  "scale": [
+    0.6201438646578342,
+    0.6334756332746254,
+    0.6334756332746254,
+    0.6416123275816135
+  ],
+  "weights": [
+    0.25670769432341656,
+    -0.28722135858362174,
+    -0.021046358888258707,
+    0.16072157518577962
+  ],
+  "intercept": 0.7734496512943342,
+  "maxObservedWeeklyCount": 11,
+  "holdoutSummary": {
+    "model": {
+      "mae": 0.5543,
+      "rmse": 0.6927
+    },
+    "baselines": {
+      "naive_lag1": {
+        "mae": 0.875,
+        "rmse": 1.2748
+      },
+      "ma4": {
+        "mae": 1.0938,
+        "rmse": 1.2343
+      }
+    }
+  }
+}

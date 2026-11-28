@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { NotaryColors } from '@/constants/notary-theme';
 import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/atoms';
 
 export default function SplashScreen() {
   const { user, loading } = useAuth();
@@ -27,7 +26,13 @@ export default function SplashScreen() {
       </View>
       <View style={styles.bottomContainer}>
         <ActivityIndicator size="large" color="#D4AF37" />
-        <Button label="Eksperimen AI offline" onPress={() => router.replace('/eksperimen-ai')} />
+        <TouchableOpacity
+          style={styles.offlineLink}
+          onPress={() => router.replace('/eksperimen-ai')}
+          accessibilityRole="button"
+          accessibilityLabel="Buka Prediksi Akta AI On-Device">
+          <Text style={styles.offlineLinkText}>Buka Prediksi Akta AI (Offline)</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -66,10 +71,22 @@ const styles = StyleSheet.create({
   subtitle: { color: '#a0a0a0', fontSize: 14, marginTop: 8 },
   bottomContainer: {
     minHeight: 100,
-    gap: 16,
+    gap: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
     width: '100%',
+  },
+  offlineLink: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.35)',
+  },
+  offlineLinkText: {
+    color: '#D4AF37',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

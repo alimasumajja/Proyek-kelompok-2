@@ -1,6 +1,35 @@
 # HANDOFF – NotarisAI Documentation Snapshot
 
-**Tanggal update:** 2026-11-15
+**Tanggal update:** 2026-11-28
+
+## Ringkasan Kondisi Terkini (2026-11-28 — Onboarding & Validasi Codebase)
+
+- **Branch aktif lokal:** `feat/offline-weekly-forecast` (`ce09f6a`, working tree bersih, sudah menggabungkan `origin/main` commit `6f974e9`, ahead 4 commit dari `origin/feat/offline-weekly-forecast`). Branch lokal `main` berada di `b712006` (tertinggal 3 commit dari `origin/main`).
+- **Status fitur utama di kode aktual:**
+  - Autentikasi (Email/Password + Google OAuth Web & Native Android dengan whitelist profil + sinkronisasi email staf), Dashboard Notaris & Staf, Layanan, Detail Layanan (RPC `change_service_stage`, `update_service_assignment`, `service_notes`, audit log & durasi), Notifikasi (Supabase + Realtime), Manajemen Jenis Layanan (Create/Read/Update/Toggle; Delete belum aktif), Tambah Layanan (`create_service`), Profil & Manajemen Staf (`create-staff` & `manage-staff`), serta Laporan Bulanan/Repertorium/Pratinjau/Ekspor PDF & Word sudah terintegrasi ke Supabase.
+  - **Masih simulasi/eksperimen:** Asisten AI di Detail Layanan (`AiAssistantSheet.tsx`) masih simulasi lokal; Eksperimen Prediksi Akta Offline (`/eksperimen-ai`, model `ridge-weekly-v1` di JS/Hermes) berada di branch `feat/offline-weekly-forecast` dan belum di-merge ke `main`.
+  - **Belum sinkron antara laporan & repo:** `Laporan ai.md` di `origin/main` mendokumentasikan fitur "Ringkasan AI" pada tab Laporan dan Edge Function `ai-assist` sudah aktif di remote Supabase, tetapi source code UI/client serta kode Edge Function `ai-assist` belum ada di repositori lokal.
+- **Verifikasi Remote Supabase (`krzyuwzyuzlmvsgdfzij`, read-only 2026-11-28):**
+  - 16 tabel `public` aktif dengan `rls_enabled = true` (`profiles`, `profile_audit_logs`, `akun`, `service_types`, `services`, `service_members`, `service_stage_history`, `service_notes`, `service_activity_logs`, `notifications`, `akta`, `akta_riwayat`, `konfirmasi_kategori`, `laporan_periode`, `laporan_snapshot`, `laporan_pengaturan`).
+  - 3 Edge Functions aktif (`create-staff` v3, `manage-staff` v4, `ai-assist` v1; semua `verify_jwt: true`).
+  - Migrasi `20261110224714_use_invoker_for_profile_audit_rpcs` terkonfirmasi **sudah terdaftar** di riwayat migrasi remote. Namun masih ada ketidakselarasan: 6 migrasi awal remote belum ada file lokalnya, sedangkan 4 file lokal (`20261114000100` s.d. `20261121000300`) tidak tercatat di tabel migrasi remote (`20261121000100` juga memiliki syntax SQL tidak valid).
+  - Publikasi `supabase_realtime` mencakup 6 tabel operasional (`notifications`, `services`, `service_members`, `service_notes`, `service_stage_history`, `service_activity_logs`), tetapi **belum mencakup `public.profiles`** (meski `AuthContext.tsx` berlangganan ke `profiles`).
+  - RLS `DELETE` pada `service_types` belum tersedia; RPC `set_service_status` sudah ada di backend & `service-store.tsx` namun belum dihubungkan ke UI Detail Layanan.
+- **Isu lama yang telah teratasi di kode terkini:**
+  - Sesi login tidak lagi terpecah (`useSession` dan `ProfileStoreProvider` kini sepenuhnya bersumber dari `AuthContext` / Supabase Auth; UI operasional tidak lagi mengandalkan data dummy).
+  - `TambahLayananScreen` sudah membaca `activeServiceTypeNames` dan `activeStaff` dari `service-store`.
+- **Dokumentasi konteks yang diperbarui:** `KonteksProyek-NotarisAI.md` telah diselaraskan dengan source code terkini, dan rule `.agents/rules/notarisai.md` (`trigger: always_on`) telah dibuat.
+- **Migrasi Fitur AI Offline ke TensorFlow Lite (`.tflite`, 2026-11-28, Noval):**
+  - Menambahkan `react-native-fast-tflite@^3.0.1` + `react-native-nitro-modules@^0.37.2`, konfigurasi `metro.config.js` (`assetExts: tflite`), deklarasi tipe `*.tflite`, dan Expo config plugin di `app.json`.
+  - Membangun pipeline reproducible `scripts/train_weekly_forecast.py` (split kronologis `22/8/8` pada data real 114 akta notaris tanpa PII) yang mengekspor `src/assets/models/weekly-forecast.tflite` (FP32, 1.120 bytes), `src/assets/models/weekly-forecast-meta.json`, `docs/project/metrics.json`, dan `scripts/weekly-model-fixtures.json`.
+  - Evaluasi holdout independen (8 minggu unseen) via `tf.lite.Interpreter`: model `tflite-log1p-ridge-regular-v2` (akta reguler mingguan) mencapai MAE `0,5543` / RMSE `0,6927` vs Naive `0,8750 / 1,2748` dan MA-4 `1,0938 / 1,2343` (max parity diff `2,58e-07`); benchmark transparan 100% semua akta (termasuk lonjakan batch PG Oktober) dan uji kuantisasi FP32/FP16/INT8 turut tercatat di `docs/project/metrics.json`.
+  - Memisahkan service inferensi async (`src/services/ai/weeklyForecastService.ts`) dengan singleton loader, timeout, pengukuran latensi, dan fallback aman untuk Expo Go/Web, serta memperbarui `WeeklyForecastScreen.tsx` dengan state siklus hidup model yang jelas.
+  - Verifikasi lulus: `npm run test:forecast` (7/7), `npm run test:oauth` (10/10), `npx tsc --noEmit` (0 error), `npx expo lint` (0 error), dan `npx expo export --platform android --max-workers 1` (1.760 modul, 57 aset termasuk `weekly-forecast.tflite` 1.120 bytes di `dist/metadata.json`). Artefak v1 lama (`weekly-ridge.json`, `export-weekly-model.py`) telah dibersihkan.
+  - **Build EAS `preview` Android terbaru (UI/UX ringkas + bebas pop-up offline + TFLite `expo-asset`):** **FINISHED & TERVERIFIKASI DI HP ANDROID (2026-11-28)** (`58425046-9dfe-4ab2-9cea-4ad28e6a38b3`, `https://expo.dev/accounts/novaladriann/projects/Kelompok2/builds/58425046-9dfe-4ab2-9cea-4ad28e6a38b3`). Pengguna mengonfirmasi APK berhasil dipasang dan fitur Prediksi Akta AI dapat digunakan baik saat **online** maupun **mode pesawat**. Memperbaiki `MalformedURLException` pada `HybridAssetLoader` Android Release APK (`ec5b5fed`), menghilangkan pop-up `Gagal memuat data laporan` saat mode pesawat lewat mode senyap di `laporan-store.ts` (dengan izin pengguna) & `syncRecentWeeksFromSupabase()` silent, memindahkan kartu pintasan AI ke bawah form Login, serta menyederhanakan `WeeklyForecastScreen` memakai grid 2×2 & accordion `Detail Model & Evaluasi`.
+
+---
+
+## Riwayat Snapshot Sebelumnya (2026-11-15)
 
 **Atribusi pekerjaan:** Implementasi Google OAuth, integrasi login Google Android,
 dan revisi UX login dikerjakan oleh **Noval**. Kepemilikan awal modul Login/Splash
